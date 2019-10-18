@@ -1,0 +1,22 @@
+Package: entRsdf
+Type: Package
+Title: Minimum-dispersion (entropy) SDFs and their regularized approximations
+Version: 0.1.0
+Date: 2019-10-16
+Author@R: person("Piotr", "Orlowski", email = "piotrek.orlowski@gmail.com", role = c("aut", "cre"))
+Maintainer: Who to complain to <yourfault@somewhere.net>
+Description: More about what it does (maybe more than one line)
+License: What license is it under?
+Imports: R6,
+  Rcpp (>= 1.0.2),
+  cccp (>= 0.2.5),
+  dplyr (>= 0.8.3.9000),
+  tibble
+LinkingTo: Rcpp, RcppArmadillo
+Suggests:
+  anytime,
+  testthat,
+  numDeriv,
+  rbenchmark,
+  nloptr
+RoxygenNote: 6.1.1

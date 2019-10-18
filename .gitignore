@@ -1,0 +1,5 @@
+*.Rproj*
+.Rbuildignore
+.Rhistory
+*.pdf
+*.csv
