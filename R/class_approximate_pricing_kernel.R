@@ -192,6 +192,21 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         private$pfolio_wts <- private$theta_pack(approximate_sdf_theta)
                                         private$pfolio_wts_df$weight <- private$theta_pack(approximate_sdf_theta)
                                         
+                                        # assign best lambdas
+                                        private$complementary_pfolio_wts <- private$entropy_foos$get_lambda_stored()
+                                        
+                                        # assign best penalty
+                                        private$best_penalty_par <- best_penalty
+                                        
+                                        # evaluate full SDF and assign
+                                        full_sdf_series <- approximate_sdf_series - 1.0 + 
+                                          private$entropy_foos$sdf_recovery(theta_vector = private$entropy_foos$get_lambda_stored()
+                                                                            , return_matrix = return_df %>% 
+                                                                              dplyr::select(-date, -foldid) %>% 
+                                                                              as.matrix())
+                                        
+                                        private$full_sdf <- tibble::tibble(date = private$sdf_series$date, sdf = as.numeric(full_sdf_series))
+                                        
                                         # update fitted status
                                         private$fitted <- TRUE
                                         
@@ -203,13 +218,39 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                       , set_penalty_par = function(new_penalty){
                                         private$penalty_par <- new_penalty
                                       }
+                                      , get_best_penalty = function(){
+                                          private$best_penalty_par
+                                      }
+                                      , get_complementary_pf_wts = function(){
+                                          private$complementary_pfolio_wts
+                                      }
+                                      , get_full_sdf = function(){
+                                        private$full_sdf
+                                      }
+                                      , full_asset_pricing = function(new_excess_returns = NULL){
+                                        if(is.null(new_excess_returns)){
+                                          new_excess_returns <- private$excess_returns
+                                        }
+                                        return_sdf_matrix <- private$full_sdf %>% 
+                                          dplyr::inner_join(new_excess_returns) %>% 
+                                          dplyr::select(-date) %>% 
+                                          as.matrix()
+                                        pricing_error <- apply(X = return_sdf_matrix[,-1L]
+                                                               , MARGIN = 2L
+                                                               , FUN = function(x) 1.0 / length(x) * crossprod(x, return_sdf_matrix[,1L]))
+                                        pricing_error <- tibble::tibble(portfolio = setdiff(colnames(new_excess_returns), "date")
+                                                                        , pricing_error = pricing_error)
+                                        return(pricing_error)
+                                      }
                                     )
                                     , private = list(
                                       full_sdf = NULL
                                       , num_folds = NULL
                                       , penalty_par = NULL
+                                      , best_penalty_par = NULL
                                       , fold_descr = NULL
                                       , entropy_foos = NULL
+                                      , complementary_pfolio_wts = NULL
                                       , cv_criterion = function(fold, return_df, coefficients_by_fold){
                                         # pick returns IN the fold for evaluating the fit
                                         return_matrix <- return_df %>% 
@@ -263,12 +304,12 @@ lev_pricing_kernel <- R6::R6Class("lev_pricing_kernel"
                                     }
                                   )
                                   , private = list(
-                                    cv_criterion = function(fold, return_df, glmnet_by_fold){
+                                    cv_criterion = function(fold, return_df, coefficients_by_fold){
                                       # recover portfolio coefficients (matrix size of num assets x penalty par)
-                                      loc_coefs <- glmnet_by_fold[[fold + 1L]]$beta
+                                      loc_coefs <- coefficients_by_fold[[fold + 1L]]$theta_compact_matrix
                                       # calculate excess leverage
                                       excess_leverage <- apply(X = loc_coefs
-                                                               , MARGIN = 2L
+                                                               , MARGIN = 1L
                                                                , function(vec){
                                                                  (sum(abs(vec)) - private$maximum_leverage)^2
                                                                })}
