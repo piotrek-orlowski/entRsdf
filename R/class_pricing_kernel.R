@@ -16,7 +16,7 @@ pricing_kernel_constructor <- function(type = c("kullback-leibler", "exponential
   
   private$type <- type[1L]
   private$entropy_foos <- switch(type
-                              , "kullback-leibler" = xlogx_functions$new()
+                              , "kullback-leibler" = et_functions$new()
                               , "exponential-tilting" = logx_functions$new()
                               , "cressie-read" = cressie_read_functions$new())
   # prepare data frame to hold sdf series
