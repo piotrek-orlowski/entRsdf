@@ -9,7 +9,3 @@ et_distance_theta_gradient <- function(lambda_opt, theta_extended, return_matrix
     .Call(`_entRsdf_et_distance_theta_gradient`, lambda_opt, theta_extended, return_matrix, mu_penalty)
 }
 
-et_distance_theta_hessian <- function(lambda_opt, theta_extended, return_matrix, mu_penalty) {
-    .Call(`_entRsdf_et_distance_theta_hessian`, lambda_opt, theta_extended, return_matrix, mu_penalty)
-}
-
