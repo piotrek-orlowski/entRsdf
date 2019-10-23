@@ -10,6 +10,7 @@ License: What license is it under?
 Imports: R6,
   Rcpp (>= 1.0.2),
   cccp (>= 0.2.5),
+  nloptr,
   dplyr (>= 0.8.3.9000),
   tibble
 LinkingTo: Rcpp, RcppArmadillo
