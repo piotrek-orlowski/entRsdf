@@ -4,3 +4,7 @@
 *.pdf
 *.csv
 .Rproj.user
+
+
+*.dll
+*.o
