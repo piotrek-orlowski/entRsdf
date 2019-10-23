@@ -82,7 +82,7 @@ arma::vec et_distance_lambda_gradient(arma::vec lambda_exact
 } 
   
 
-// Currenly unnecessary
+// Currently unnecessary
 arma::mat et_distance_lambda_hessian(arma::vec lambda_exact
                               , arma::vec theta_extended
                               , arma::mat return_matrix
@@ -131,7 +131,7 @@ arma::mat et_distance_theta_gradient(arma::vec lambda_opt
   return res;
 }
 
-// [[Rcpp::export]]
+// Currently unnecessary
 arma::mat et_distance_theta_hessian(arma::vec lambda_opt
                                        , arma::vec theta_extended
                                        , arma::mat return_matrix
