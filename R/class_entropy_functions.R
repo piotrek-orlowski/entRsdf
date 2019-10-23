@@ -57,7 +57,7 @@ et_functions <- R6::R6Class("et_functions"
 distance_et_functions <- R6::R6Class("distance_et_functions"
                                      , inherit = entropy_functions
                                      , public = list(
-                                        objective = function(theta_vector, return_matrix, penalty_value, store_lambda = TRUE){
+                                        objective = function(theta_vector, return_matrix, penalty_value){
                                           
                                           # Check if there is a pre-estimated lambda (to get a starting value for the first optimisation)
                                           if(is.null(private$lambda_opt)){
@@ -80,10 +80,7 @@ distance_et_functions <- R6::R6Class("distance_et_functions"
                                           # Recover optimal decision
                                           lambda_opt <- optimisation_result$solution
                                           
-                                          # save lambda_opt
-                                          if(store_lambda){
-                                            private$lambda_opt <- lambda_opt 
-                                          }
+                                          private$lambda_opt <- lambda_opt 
                                           
                                           # Calculate gradient wrt theta
                                           gradient_theta <- et_distance_theta_gradient(lambda_opt
@@ -115,6 +112,10 @@ distance_et_functions <- R6::R6Class("distance_et_functions"
                                         # }
                                         , get_lambda_stored = function(){
                                           private$lambda_opt
+                                        }
+                                        , sdf_recovery = function(theta_vector, return_matrix){
+                                          res <- exp(return_matrix %*% theta_vector)
+                                          return(res)
                                         }
                                      )
                                      , private = list(
