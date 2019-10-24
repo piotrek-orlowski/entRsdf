@@ -172,7 +172,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                                 )
                                                })
                                             
-                                            optimisation_coeffs <- abind(lapply(optimisation_list, abind, along = 3L), along = 3L)
+                                            optimisation_coeffs <- abind::abind(lapply(optimisation_list, abind::abind, along = 3L), along = 3L)
                                             
                                             theta_store[,] <- t(optimisation_coeffs[1L,,])
                                             lambda_store[,] <- t(optimisation_coeffs[2L,,])
@@ -448,7 +448,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                          )
                                                        })
                                                      
-                                                     optimisation_coeffs <- abind(lapply(optimisation_list, abind, along = 3L), along = 3L)
+                                                     optimisation_coeffs <- abind::abind(lapply(optimisation_list, abind::abind, along = 3L), along = 3L)
                                                      
                                                      theta_store[,] <- t(optimisation_coeffs[1L,,])
                                                      lambda_store[,] <- t(optimisation_coeffs[2L,,])
