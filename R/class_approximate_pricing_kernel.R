@@ -567,7 +567,7 @@ window_lev_pricing_kernel = R6::R6Class("window_lev_pricing_kernel"
                                           }
                                         )
                                         , private = list(
-                                          cv_criterion = function(fold, return_df, glmnet_by_fold){
+                                          cv_criterion = function(fold, return_df, coefficients_by_fold){
                                             # recover portfolio coefficients (matrix size of num assets x penalty par)
                                             loc_coefs <- glmnet_by_fold[[fold + 1L]]$beta
                                             # calculate excess leverage
