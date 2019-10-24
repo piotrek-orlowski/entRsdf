@@ -24,9 +24,9 @@ sdf_class <- args[1]
 sdf_parameter <- args[2]
 
 if(grepl("lev", sdf_class)){
-  sdf_create_string <- sprintf("sdf <- %s$new(excess_returns = test_assets, type = 'kullback-leibler', penalty_par = penalty_path, num_folds = 3L, maximum_leverage = as.numeric(%s))", sdf_class, sdf_parameter)
+  sdf_create_string <- sprintf("sdf <- %s$new(excess_returns = test_assets, type = 'kullback-leibler', penalty_par = penalty_path, num_folds = 3L, maximum_leverage = as.numeric(%s), sample_type = 'expanding', sample_span = 180)", sdf_class, sdf_parameter)
   } else {
-    sdf_create_string <- sprintf("sdf <- %s$new(excess_returns = test_assets, type = 'kullback-leibler', penalty_par = penalty_path, num_folds = as.numeric(%s))", sdf_class, sdf_parameter)
+    sdf_create_string <- sprintf("sdf <- %s$new(excess_returns = test_assets, type = 'kullback-leibler', penalty_par = penalty_path, num_folds = as.numeric(%s), sample_type = 'expanding', sample_span = 180)", sdf_class, sdf_parameter)
     }
 
 eval(parse(text = sdf_create_string))
