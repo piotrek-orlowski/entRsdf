@@ -7,11 +7,19 @@ cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date =
   super$initialize(type = type
                    , excess_returns = excess_returns)
   
+  # complementary sdf series and weights
+  private$full_sdf_series <- private$sdf_series
+  private$complementary_pfolio_wts <- private$pfolio_wts
+  private$complementary_pfolio_wts_df <- private$pfolio_wts_df
+  
+  
   # set up functions
   private$entropy_foos <- switch(type
                                  , "kullback-leibler" = distance_et_functions$new()
                                  , "exponential-tilting" = distance_el_functions$new()
                                  , "cressie-read" = distance_cressie_read_functions$new())
+  
+  private$best_penalty_par <- NA_real_
   
   # Set up fields specific to the cross-validated kernel:
   # Number of folds and penalty parameter (lambda) vector
@@ -23,14 +31,12 @@ window_cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble
                                                  , type = c("kullback-leibler", "exponential-tilting", "cressie-read")
                                                  , penalty_par
                                                  , num_folds = 5L
-                                                 , fit_full = FALSE
                                                  , sample_type = c("expanding", "rolling")
                                                  , sample_span = 180L){
   # Call the super class initializer
   super$initialize(excess_returns = excess_returns
                    , type = type
                    , penalty_par = penalty_par
-                   , fit_full = fit_full
                    , num_folds = num_folds
                    )
   
@@ -53,10 +59,19 @@ window_cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble
                                , nrow = nrow(excess_returns) - sample_span
                                , ncol = ncol(excess_returns) - 1L)
   
+  # complementary sdf series and weights
+  private$full_sdf_series <- private$sdf_series
+  private$complementary_pfolio_wts <- private$pfolio_wts
+  private$complementary_pfolio_wts_df <- private$pfolio_wts_df
+  
   # vector of normalizing constants of length num_dates - sample_span
   private$normalizing_constant <- matrix(NA_real_
                                          , nrow = nrow(excess_returns) - sample_span
                                          , ncol = 1L)
+  
+  private$best_penalty_par <- matrix(NA_real_
+                                 , nrow = nrow(excess_returns) - sample_span
+                                 , ncol = 1L)
   
   # function for determining indexing vector in rolling and expanding window
   private$window_function <- ifelse(test = sample_type == "rolling"
@@ -194,6 +209,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         
                                         # assign best lambdas
                                         private$complementary_pfolio_wts <- private$entropy_foos$get_lambda_stored()
+                                        private$complementary_pfolio_wts_df$weight <- private$entropy_foos$get_lambda_stored()
                                         
                                         # assign best penalty
                                         private$best_penalty_par <- best_penalty
@@ -205,7 +221,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                                                               dplyr::select(-date, -foldid) %>% 
                                                                               as.matrix())
                                         
-                                        private$full_sdf <- tibble::tibble(date = private$sdf_series$date, sdf = as.numeric(full_sdf_series))
+                                        private$full_sdf_series <- tibble::tibble(date = private$sdf_series$date, sdf = as.numeric(full_sdf_series))
                                         
                                         # update fitted status
                                         private$fitted <- TRUE
@@ -224,14 +240,14 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                       , get_complementary_pf_wts = function(){
                                           private$complementary_pfolio_wts
                                       }
-                                      , get_full_sdf = function(){
-                                        private$full_sdf
+                                      , get_full_sdf_series = function(){
+                                        private$full_sdf_series
                                       }
                                       , full_asset_pricing = function(new_excess_returns = NULL){
                                         if(is.null(new_excess_returns)){
                                           new_excess_returns <- private$excess_returns
                                         }
-                                        return_sdf_matrix <- private$full_sdf %>% 
+                                        return_sdf_matrix <- private$full_sdf_series %>% 
                                           dplyr::inner_join(new_excess_returns) %>% 
                                           dplyr::select(-date) %>% 
                                           as.matrix()
@@ -244,13 +260,14 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                       }
                                     )
                                     , private = list(
-                                      full_sdf = NULL
+                                      full_sdf_series = NULL
                                       , num_folds = NULL
                                       , penalty_par = NULL
                                       , best_penalty_par = NULL
                                       , fold_descr = NULL
                                       , entropy_foos = NULL
                                       , complementary_pfolio_wts = NULL
+                                      , complementary_pfolio_wts_df = NULL
                                       , cv_criterion = function(fold, return_df, coefficients_by_fold){
                                         # pick returns IN the fold for evaluating the fit
                                         return_matrix <- return_df %>% 
@@ -321,7 +338,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                         , public = list(
                                           initialize = window_cv_pricing_kernel_constructor
                                           , fit = function(solver_trace = FALSE, ...){
-                                              return_df <- private$excess_returns
+                                              return_df <- self$get_excess_returns()
                                               # make period index
                                               fitting_index <- (private$sample_span + 1L):nrow(private$excess_returns)
                                               
@@ -331,13 +348,9 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 fitting_window <- private$window_function(index_)
                                                 # subset returns
                                                 return_df <- return_df[fitting_window,]
-                                                # plug them into private$full_sdf$set_excess_returns()
-                                                suppressWarnings(private$full_sdf$set_excess_returns(return_df))
-                                                # fit the full sdf on limited sample
-                                                private$full_sdf$fit()
-                                                # Recover const + portfolio
-                                                target_portfolio <- private$full_sdf$get_normalizing_constant() + 
-                                                  as.matrix(return_df %>% select(-date)) %*% private$full_sdf$get_pfolio_wts()
+                                                # Set up options for optimizer
+                                                def_opts <- nloptr::nl.opts()
+                                                def_opts$algorithm <- "NLOPT_LD_LBFGS"
                                                 # Create folds
                                                 set.seed(142L)
                                                 return_df <- return_df %>% 
@@ -347,68 +360,153 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 # Go across folds Thu Oct 17 23:53:14 2019 ------------------------------
                                                 all_folds <- 0L:(private$num_folds-1L)
                                                 # Fit glmnet on every fold and save to list
-                                                glmnet_by_fold <- lapply(all_folds
-                                                                         , function(fold){
-                                                                           # for fitting you use data NOT in the fold
-                                                                           glmnet::glmnet(y = target_portfolio[return_df$foldid != fold]
-                                                                                          , x = return_df %>% 
-                                                                                            dplyr::filter(foldid != fold) %>% 
-                                                                                            dplyr::select(-date, -foldid) %>% 
-                                                                                            as.matrix()
-                                                                                          , lambda = private$penalty_par)
-                                                                         })
+                                                coefficients_by_fold <- lapply(all_folds
+                                                                               , function(fold){
+                                                                                 # for fitting you use data NOT in the fold
+                                                                                 return_matrix <- return_df %>% 
+                                                                                   dplyr::filter(foldid != fold) %>% 
+                                                                                   dplyr::select(-date, -foldid) %>% 
+                                                                                   as.matrix()
+                                                                                 
+                                                                                 theta_extended_init <- rep(0.0, 2L * ncol(return_matrix))
+                                                                                 
+                                                                                 # matrices for storing thetas and lambdas
+                                                                                 theta_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
+                                                                                 lambda_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
+                                                                                 
+                                                                                 outer_sol <- nloptr::nloptr(x0 = theta_extended_init
+                                                                                                             , eval_f = private$entropy_foos$objective
+                                                                                                             , lb = rep(0,length(theta_extended_init))
+                                                                                                             , opts = def_opts
+                                                                                                             , return_matrix = return_matrix
+                                                                                                             , penalty_value = private$penalty_par[1L]
+                                                                                 )
+                                                                                 
+                                                                                 # initialize counter
+                                                                                 counter <- 1L
+                                                                                 
+                                                                                 # write temp theta solution
+                                                                                 temp_solution <- outer_sol$solution
+                                                                                 theta_store[counter, ] <- private$theta_pack(temp_solution)
+                                                                                 
+                                                                                 # recover lambda and write
+                                                                                 temp_lambda <- private$entropy_foos$get_lambda_stored()
+                                                                                 lambda_store[counter, ] <- temp_lambda
+                                                                                 
+                                                                                 # continue optimising for the rest of the penalty values
+                                                                                 for(mu in private$penalty_par[-1L]){
+                                                                                   outer_sol <- nloptr::nloptr(x0 = outer_sol$solution
+                                                                                                               , eval_f = private$entropy_foos$objective
+                                                                                                               , lb = rep(0,length(theta_extended_init))
+                                                                                                               , opts = def_opts
+                                                                                                               , return_matrix = return_matrix
+                                                                                                               , penalty_value = mu
+                                                                                   )
+                                                                                   
+                                                                                   # increment counter and assign
+                                                                                   counter <- counter + 1
+                                                                                   # write temp theta solution
+                                                                                   temp_solution <- outer_sol$solution
+                                                                                   theta_store[counter, ] <- private$theta_pack(temp_solution)
+                                                                                   
+                                                                                   # recover lambda and write
+                                                                                   temp_lambda <- private$entropy_foos$get_lambda_stored()
+                                                                                   lambda_store[counter, ] <- temp_lambda
+                                                                                 }
+                                                                                 
+                                                                                 return(list(theta_compact_matrix = theta_store
+                                                                                             , lambda_matrix = lambda_store))
+                                                                               })
                                                 # Based on coefficients estimated on each fold, construct SDFs from the data that was left out from the estimation, and use them to price the fold
                                                 # Each element of this list contains a vector of sums of squared pricing errors (across assets) for all lambdas
                                                 # These are fold-wise cv curves
                                                 cv_criterion_by_fold <- lapply(all_folds
-                                                                                   , private$cv_criterion
-                                                                                   , return_df = return_df
-                                                                                   , glmnet_by_fold = glmnet_by_fold)
+                                                                               , private$cv_criterion
+                                                                               , return_df = return_df
+                                                                               , coefficients_by_fold = coefficients_by_fold)
                                                 # put all fold-wise cv curves in a matrix
                                                 # each row = cv crit values for a given lambda
                                                 cv_criterion <- do.call(cbind, cv_criterion_by_fold)
-                                                # average for each lambda (by row)
+                                                
+                                                # average for each penalty (by row)
                                                 cv_criterion <- apply(cv_criterion, 1L, mean)
-                                                # pick lambda where the squared pricing errors are lowest
+                                                
+                                                # pick penalty where the squared pricing errors are lowest
                                                 best_penalty <- private$penalty_par[which.min(cv_criterion)]
-                                                # estimate model for that lambda on all data
-                                                glmnet_approximation <- glmnet::glmnet(y = target_portfolio
-                                                                                       , x = return_df %>% 
-                                                                                         dplyr::select(-date, -foldid) %>% 
-                                                                                         as.matrix()
-                                                                                       , lambda = best_penalty)
                                                 
-                                                # generate penalised SDF in sample
-                                                approximate_sdf_series <- private$entropy_foos$sdf_recovery(theta_vector = as.matrix(glmnet:::coef.glmnet(glmnet_approximation))
-                                                                                                            , return_matrix = return_df %>% 
-                                                                                                                dplyr::select(-date, -foldid) %>% 
-                                                                                                                as.matrix())
+                                                # estimate model for that penalty on all data
+                                                # start from average theta for that penalty
+                                                average_theta <- sapply(coefficients_by_fold, function(cf_list){
+                                                  cf_list$theta_compact_matrix[which.min(cv_criterion), ]
+                                                })
+                                                average_theta <- apply(average_theta, 1L, mean)
+                                                approximate_sdf_theta <- nloptr::nloptr(x0 = private$theta_unpack(average_theta)
+                                                                                        , eval_f = private$entropy_foos$objective
+                                                                                        , lb = rep(0,2L*length(average_theta))
+                                                                                        , opts = def_opts
+                                                                                        , return_matrix = return_df %>% 
+                                                                                          dplyr::select(-date, -foldid) %>% 
+                                                                                          as.matrix()
+                                                                                        , penalty_value = best_penalty)$solution
                                                 
-                                                # generate one-step ahead penalised sdf value
-                                                approximate_sdf_oos <- private$entropy_foos$sdf_recovery(theta_vector = as.matrix(glmnet:::coef.glmnet(glmnet_approximation))
-                                                                                                         , private$excess_returns %>% 
-                                                                                                            dplyr::select(-date) %>% 
-                                                                                                            as.matrix() %>% 
-                                                                                                            .[index_,,drop=FALSE])
+                                                # generate penalised SDF
+                                                approximate_sdf_series <- private$entropy_foos$sdf_recovery(theta_vector = private$theta_pack(approximate_sdf_theta)
+                                                                                                            , return_matrix = self$get_excess_returns() %>% 
+                                                                                                              dplyr::select(-date) %>% 
+                                                                                                              as.matrix() %>% 
+                                                                                                              .[c(fitting_window, index_),])
+                                                
+                                                # assign best lambdas
+                                                complementary_pfolio_wts <- private$entropy_foos$get_lambda_stored()
+                                                
+                                                
+                                                # evaluate full SDF and assign
+                                                full_sdf_series <- approximate_sdf_series - 1.0 + 
+                                                  private$entropy_foos$sdf_recovery(theta_vector = private$entropy_foos$get_lambda_stored()
+                                                                                    , return_matrix = self$get_excess_returns() %>% 
+                                                                                      dplyr::select(-date) %>% 
+                                                                                      as.matrix() %>% 
+                                                                                      .[c(fitting_window, index_),])
+                                                
                                                 
                                                 # return:
                                                 #   - norm const
                                                 #   - wts
                                                 #   - best lambda
                                                 #   - skip sdf value because we will construct it later
-                                                list(glmnet_coefs = glmnet:::coef.glmnet(glmnet_approximation)
+                                                list(theta_vector = private$theta_pack(approximate_sdf_theta)
+                                                     , lambda_vector = private$entropy_foos$get_lambda_stored()
                                                      , best_penalty = best_penalty
-                                                     , sdf_rescale = mean(approximate_sdf_series)
-                                                     , sdf_value = approximate_sdf_oos)
+                                                     , sdf_rescale = mean(head(approximate_sdf_series,-1))
+                                                     , sdf_value = tail(approximate_sdf_series, 1L)
+                                                     , full_sdf_value = tail(full_sdf_series, 1L)
+                                                     , full_sdf_rescale = mean(head(approximate_sdf_series,-1)))
                                               })
+                                              
                                               # assign time series of sdf, norm consts, wts
                                               approximate_sdf_oos <- sapply(penalised_fits, function(x) x$sdf_value)
-                                              pfolio_wts <- sapply(penalised_fits, function(x) as.numeric(x$glmnet_coefs))
+                                              
+                                              # assigne time series of full sdf
+                                              full_sdf_oos <- sapply(penalised_fits, function(x) x$full_sdf_value)
+                                              private$full_sdf_series <- tibble::tibble(date = private$sdf_series$date, sdf = as.numeric(full_sdf_oos))
+                                              
+                                              pfolio_wts <- sapply(penalised_fits, function(x) as.numeric(x$theta_vector))
                                               
                                               private$sdf_series$sdf <- approximate_sdf_oos
+                                              
                                               # be careful when assigning pfolio weights, dimension (1 + num_assets) x num_periods
-                                              private$pfolio_wts[,] <- t(pfolio_wts[-1L,])
-                                              private$pfolio_wts_df$weight <- as.numeric(t(pfolio_wts[-1L,]))
+                                              private$pfolio_wts[,] <- t(pfolio_wts)
+                                              private$pfolio_wts_df$weight <- as.numeric(t(pfolio_wts))
+                                              
+                                              # be careful when assigning pfolio weights, dimension (1 + num_assets) x num_periods
+                                              # private$complementary_pfolio_wts <- private$pfolio_wts
+                                              complementary_pfolio_wts <- sapply(penalised_fits, function(x) as.numeric(x$lambda_vector))
+                                              private$complementary_pfolio_wts[,] <- t(complementary_pfolio_wts)
+                                              # private$complementary_pfolio_wts_df <- private$pfolio_wts_df
+                                              private$complementary_pfolio_wts_df$weight <-  as.numeric(t(complementary_pfolio_wts))
+                                              
+                                              # penalties
+                                              private$best_penalty_par[,] <- sapply(penalised_fits, function(x) x$best_penalty)
                                               
                                               invisible(self)
                                           })
