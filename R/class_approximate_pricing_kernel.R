@@ -96,7 +96,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         } else {
                                           par_cluster <- parallel::makeCluster(as.numeric(Sys.getenv("NUM_CORES")))
                                         }
-                                        clusterEvalQ(par_cluster
+                                        sink <- parallel::clusterEvalQ(par_cluster
                                                      , {
                                                        library(entRsdf)
                                                        if(require("RevoUtilsMath")){
@@ -245,7 +245,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         private$fitted <- TRUE
                                         
                                         # stop cluster
-                                        stopCluster(par_cluster)
+                                        parallel::stopCluster(par_cluster)
                                         
                                         invisible(self)
                                       }
@@ -366,7 +366,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                               } else {
                                                 par_cluster <- parallel::makeCluster(as.numeric(Sys.getenv("NUM_CORES")))
                                               }
-                                              clusterEvalQ(par_cluster
+                                              parallel::clusterEvalQ(par_cluster
                                                            , {
                                                              library(entRsdf)
                                                              if(require("RevoUtilsMath")){
@@ -548,7 +548,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                               private$best_penalty_par[,] <- sapply(penalised_fits, function(x) x$best_penalty)
                                               
                                               # stop cluster
-                                              stopCluster(par_cluster)
+                                              parallel::stopCluster(par_cluster)
                                               
                                               invisible(self)
                                           })
