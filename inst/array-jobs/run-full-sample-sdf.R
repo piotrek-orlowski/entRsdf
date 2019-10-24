@@ -33,4 +33,5 @@ eval(parse(text = sdf_create_string))
 
 sdf$fit()
 
-readr::write_csv(sdf$get_sdf_series(), path = sprintf("%s-%s-approx-sdf.csv", sdf_class, sdf_parameter))
+readr::write_csv(sdf$get_sdf_series(), path = sprintf("sdf-ts-%s-%s.csv", sdf_class, sdf_parameter))
+save(sdf, file = sprintf("sdf-object-%s-%s.csv", sdf_class, sdf_parameter))
