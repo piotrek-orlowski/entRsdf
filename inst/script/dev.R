@@ -336,12 +336,24 @@ system.time(
 
 #### DEV ROLLING ###
 
-cv_debug <- window_cv_pricing_kernel$new(excess_returns = test_assets[1:182,]
+cv_debug <- window_cv_pricing_kernel$new(excess_returns = test_assets
                                          , type = "kullback-leibler"
-                                         , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 120))
+                                         , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
+                                         , num_folds = 10L
+                                         , sample_type = "expanding"
+                                         , sample_span = 517)
+system.time(
+  cv_debug$fit()
+)
+
+
+cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets
+                                         , type = "kullback-leibler"
+                                         , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
                                          , num_folds = 3L
                                          , sample_type = "expanding"
-                                         , sample_span = 180)
+                                         , sample_span = 517
+                                         , maximum_leverage = 20)
 system.time(
   cv_debug$fit()
 )
