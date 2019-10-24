@@ -89,6 +89,22 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                     , public = list(
                                       initialize = cv_pricing_kernel_constructor
                                       , fit = function(solver_trace = FALSE, ...){
+                                        
+                                        # make cluster and first check environment variable for its size
+                                        if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
+                                          par_cluster <- parallel::makeCluster(detectCores(TRUE))  
+                                        } else {
+                                          par_cluster <- parallel::makeCluster(as.numeric(Sys.getenv("NUM_CORES")))
+                                        }
+                                        clusterEvalQ(par_cluster
+                                                     , {
+                                                       library(entRsdf)
+                                                       if(require("RevoUtilsMath")){
+                                                         setMKLthreads(1L) 
+                                                       }
+                                                       NULL
+                                                     })
+                                        
                                         # Create folds in returns Thu Oct 17 23:41:01 2019 ------------------------------
                                         return_df <- self$get_excess_returns()
                                         set.seed(142L)
@@ -119,46 +135,48 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                            theta_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
                                            lambda_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
                                            
-                                           outer_sol <- nloptr::nloptr(x0 = theta_extended_init
-                                                                       , eval_f = private$entropy_foos$objective
-                                                                       , lb = rep(0,length(theta_extended_init))
-                                                                       , opts = def_opts
-                                                                       , return_matrix = return_matrix
-                                                                       , penalty_value = private$penalty_par[1L]
-                                           )
+                                           # make a copy of the foos object for export to cluster
+                                           foos_copy <- private$entropy_foos$clone(deep = TRUE)
                                            
-                                           # initialize counter
-                                           counter <- 1L
+                                           # export the necessary objects to the cluster:
+                                           #  - foos_copy
+                                           #  - theta_extended_init
+                                           #  - def_opts
+                                           #  - return_matrix
+                                           parallel::clusterExport(par_cluster, c("foos_copy"
+                                                                                  , "theta_extended_init"
+                                                                                  , "def_opts"
+                                                                                  , "return_matrix")
+                                                                   , envir = environment())
                                            
-                                           # write temp theta solution
-                                           temp_solution <- outer_sol$solution
-                                           theta_store[counter, ] <- private$theta_pack(temp_solution)
+                                           penalty_split <- split(private$penalty_par, ceiling(seq_along(private$penalty_par)/ceiling(length(private$penalty_par)/length(par_cluster))))
                                            
-                                           # recover lambda and write
-                                           temp_lambda <- private$entropy_foos$get_lambda_stored()
-                                           lambda_store[counter, ] <- temp_lambda
-                                                                                  
-                                           # continue optimising for the rest of the penalty values
-                                           for(mu in private$penalty_par[-1L]){
-                                             outer_sol <- nloptr::nloptr(x0 = outer_sol$solution
-                                                                         , eval_f = private$entropy_foos$objective
-                                                                         , lb = rep(0,length(theta_extended_init))
-                                                                         , opts = def_opts
-                                                                         , return_matrix = return_matrix
-                                                                         , penalty_value = mu
-                                             )
+                                           optimisation_list <- parallel::parLapplyLB(
+                                             cl = par_cluster
+                                             , X = penalty_split
+                                             , fun = function(mu_list){
+                                                temp_sol <- rep(0, length(theta_extended_init))
+                                                lapply(mu_list, function(mu) {
+                                                  outer_sol <- nloptr::nloptr(x0 = temp_sol
+                                                                              , eval_f = foos_copy$objective
+                                                                              , lb = rep(0, length(temp_sol))
+                                                                              , opts = def_opts
+                                                                              , return_matrix = return_matrix
+                                                                              , penalty_value = mu)
+                                                  temp_sol <<- outer_sol$solution
+                                                  sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
+                                                  sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
+                                                  rbind(theta_packed = sol_packed
+                                                        , lambda_full = foos_copy$get_lambda_stored())
+                                                }
+                                                )
+                                               })
+                                            
+                                            optimisation_coeffs <- abind(lapply(optimisation_list, abind, along = 3L), along = 3L)
+                                            
+                                            theta_store[,] <- t(optimisation_coeffs[1L,,])
+                                            lambda_store[,] <- t(optimisation_coeffs[2L,,])
                                              
-                                             # increment counter and assign
-                                             counter <- counter + 1
-                                             # write temp theta solution
-                                             temp_solution <- outer_sol$solution
-                                             theta_store[counter, ] <- private$theta_pack(temp_solution)
-                                             
-                                             # recover lambda and write
-                                             temp_lambda <- private$entropy_foos$get_lambda_stored()
-                                             lambda_store[counter, ] <- temp_lambda
-                                           }
-                                           
                                            return(list(theta_compact_matrix = theta_store
                                                        , lambda_matrix = lambda_store))
                                                                          })
@@ -225,6 +243,9 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         
                                         # update fitted status
                                         private$fitted <- TRUE
+                                        
+                                        # stop cluster
+                                        stopCluster(par_cluster)
                                         
                                         invisible(self)
                                       }
@@ -338,6 +359,22 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                         , public = list(
                                           initialize = window_cv_pricing_kernel_constructor
                                           , fit = function(solver_trace = FALSE, ...){
+                                              
+                                              # make cluster and first check environment variable for its size
+                                              if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
+                                                par_cluster <- parallel::makeCluster(detectCores(TRUE))  
+                                              } else {
+                                                par_cluster <- parallel::makeCluster(as.numeric(Sys.getenv("NUM_CORES")))
+                                              }
+                                              clusterEvalQ(par_cluster
+                                                           , {
+                                                             library(entRsdf)
+                                                             if(require("RevoUtilsMath")){
+                                                               setMKLthreads(1L) 
+                                                             }
+                                                             NULL
+                                                           })
+                                            
                                               return_df <- self$get_excess_returns()
                                               # make period index
                                               fitting_index <- (private$sample_span + 1L):nrow(private$excess_returns)
@@ -361,61 +398,63 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 all_folds <- 0L:(private$num_folds-1L)
                                                 # Fit glmnet on every fold and save to list
                                                 coefficients_by_fold <- lapply(all_folds
-                                                                               , function(fold){
-                                                                                 # for fitting you use data NOT in the fold
-                                                                                 return_matrix <- return_df %>% 
-                                                                                   dplyr::filter(foldid != fold) %>% 
-                                                                                   dplyr::select(-date, -foldid) %>% 
-                                                                                   as.matrix()
-                                                                                 
-                                                                                 theta_extended_init <- rep(0.0, 2L * ncol(return_matrix))
-                                                                                 
-                                                                                 # matrices for storing thetas and lambdas
-                                                                                 theta_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
-                                                                                 lambda_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
-                                                                                 
-                                                                                 outer_sol <- nloptr::nloptr(x0 = theta_extended_init
-                                                                                                             , eval_f = private$entropy_foos$objective
-                                                                                                             , lb = rep(0,length(theta_extended_init))
-                                                                                                             , opts = def_opts
-                                                                                                             , return_matrix = return_matrix
-                                                                                                             , penalty_value = private$penalty_par[1L]
-                                                                                 )
-                                                                                 
-                                                                                 # initialize counter
-                                                                                 counter <- 1L
-                                                                                 
-                                                                                 # write temp theta solution
-                                                                                 temp_solution <- outer_sol$solution
-                                                                                 theta_store[counter, ] <- private$theta_pack(temp_solution)
-                                                                                 
-                                                                                 # recover lambda and write
-                                                                                 temp_lambda <- private$entropy_foos$get_lambda_stored()
-                                                                                 lambda_store[counter, ] <- temp_lambda
-                                                                                 
-                                                                                 # continue optimising for the rest of the penalty values
-                                                                                 for(mu in private$penalty_par[-1L]){
-                                                                                   outer_sol <- nloptr::nloptr(x0 = outer_sol$solution
-                                                                                                               , eval_f = private$entropy_foos$objective
-                                                                                                               , lb = rep(0,length(theta_extended_init))
-                                                                                                               , opts = def_opts
-                                                                                                               , return_matrix = return_matrix
-                                                                                                               , penalty_value = mu
-                                                                                   )
-                                                                                   
-                                                                                   # increment counter and assign
-                                                                                   counter <- counter + 1
-                                                                                   # write temp theta solution
-                                                                                   temp_solution <- outer_sol$solution
-                                                                                   theta_store[counter, ] <- private$theta_pack(temp_solution)
-                                                                                   
-                                                                                   # recover lambda and write
-                                                                                   temp_lambda <- private$entropy_foos$get_lambda_stored()
-                                                                                   lambda_store[counter, ] <- temp_lambda
-                                                                                 }
-                                                                                 
-                                                                                 return(list(theta_compact_matrix = theta_store
-                                                                                             , lambda_matrix = lambda_store))
+                                                   , function(fold){
+                                                     # for fitting you use data NOT in the fold
+                                                     return_matrix <- return_df %>% 
+                                                       dplyr::filter(foldid != fold) %>% 
+                                                       dplyr::select(-date, -foldid) %>% 
+                                                       as.matrix()
+                                                     
+                                                     theta_extended_init <- rep(0.0, 2L * ncol(return_matrix))
+                                                     
+                                                     # matrices for storing thetas and lambdas
+                                                     theta_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
+                                                     lambda_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
+                                                     
+                                                     # make a copy of the foos object for export to cluster
+                                                     foos_copy <- private$entropy_foos$clone(deep = TRUE)
+                                                     
+                                                     # export the necessary objects to the cluster:
+                                                     #  - foos_copy
+                                                     #  - theta_extended_init
+                                                     #  - def_opts
+                                                     #  - return_matrix
+                                                     parallel::clusterExport(par_cluster, c("foos_copy"
+                                                                                            , "theta_extended_init"
+                                                                                            , "def_opts"
+                                                                                            , "return_matrix")
+                                                                             , envir = environment())
+                                                     
+                                                     penalty_split <- split(private$penalty_par, ceiling(seq_along(private$penalty_par)/ceiling(length(private$penalty_par)/length(par_cluster))))
+                                                     
+                                                     optimisation_list <- parallel::parLapplyLB(
+                                                       cl = par_cluster
+                                                       , X = penalty_split
+                                                       , fun = function(mu_list){
+                                                         temp_sol <- rep(0, length(theta_extended_init))
+                                                         lapply(mu_list, function(mu) {
+                                                           outer_sol <- nloptr::nloptr(x0 = temp_sol
+                                                                                       , eval_f = foos_copy$objective
+                                                                                       , lb = rep(0, length(temp_sol))
+                                                                                       , opts = def_opts
+                                                                                       , return_matrix = return_matrix
+                                                                                       , penalty_value = mu)
+                                                           temp_sol <<- outer_sol$solution
+                                                           sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
+                                                           sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
+                                                           rbind(theta_packed = sol_packed
+                                                                 , lambda_full = foos_copy$get_lambda_stored())
+                                                         }
+                                                         )
+                                                       })
+                                                     
+                                                     optimisation_coeffs <- abind(lapply(optimisation_list, abind, along = 3L), along = 3L)
+                                                     
+                                                     theta_store[,] <- t(optimisation_coeffs[1L,,])
+                                                     lambda_store[,] <- t(optimisation_coeffs[2L,,])
+                                                     
+                                                     return(list(theta_compact_matrix = theta_store
+                                                                 , lambda_matrix = lambda_store))
                                                                                })
                                                 # Based on coefficients estimated on each fold, construct SDFs from the data that was left out from the estimation, and use them to price the fold
                                                 # Each element of this list contains a vector of sums of squared pricing errors (across assets) for all lambdas
@@ -507,6 +546,9 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                               
                                               # penalties
                                               private$best_penalty_par[,] <- sapply(penalised_fits, function(x) x$best_penalty)
+                                              
+                                              # stop cluster
+                                              stopCluster(par_cluster)
                                               
                                               invisible(self)
                                           })

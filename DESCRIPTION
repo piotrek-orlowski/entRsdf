@@ -12,12 +12,12 @@ Imports: R6,
   cccp (>= 0.2.5),
   nloptr,
   dplyr (>= 0.8.3.9000),
-  tibble
+  tibble,
+  parallel
 LinkingTo: Rcpp, RcppArmadillo
 Suggests:
   anytime,
   testthat,
   numDeriv,
-  rbenchmark,
-  nloptr
+  rbenchmark
 RoxygenNote: 6.1.1
