@@ -157,13 +157,18 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                              , fun = function(mu_list){
                                                 temp_sol <- rep(0, length(theta_extended_init))
                                                 lapply(mu_list, function(mu) {
-                                                  outer_sol <- nloptr::nloptr(x0 = temp_sol
+                                                  outer_sol <- tryCatch(
+                                                      nloptr::nloptr(x0 = temp_sol
                                                                               , eval_f = foos_copy$objective
                                                                               , lb = rep(0, length(temp_sol))
                                                                               , opts = def_opts
                                                                               , return_matrix = return_matrix
                                                                               , penalty_value = mu)
-                                                  temp_sol <<- outer_sol$solution
+                                                  , error = function(e) rep(NA_real_, length(temp_sol))
+                                                  )
+                                                  if(!any(is.na(outer_sol))){
+                                                    temp_sol <<- outer_sol$solution  
+                                                  }
                                                   sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
                                                   sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
                                                   rbind(theta_packed = sol_packed
@@ -193,7 +198,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         cv_criterion <- do.call(cbind, cv_criterion_by_fold)
                                         
                                         # average for each penalty (by row)
-                                        cv_criterion <- apply(cv_criterion, 1L, mean)
+                                        cv_criterion <- apply(cv_criterion, 1L, mean, na.rm=TRUE)
                                         
                                         # pick penalty where the squared pricing errors are lowest
                                         best_penalty <- private$penalty_par[which.min(cv_criterion)]
@@ -203,7 +208,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         average_theta <- sapply(coefficients_by_fold, function(cf_list){
                                           cf_list$theta_compact_matrix[which.min(cv_criterion), ]
                                         })
-                                        average_theta <- apply(average_theta, 1L, mean)
+                                        average_theta <- apply(average_theta, 1L, mean, na.rm=TRUE)
                                         approximate_sdf_theta <- nloptr::nloptr(x0 = private$theta_unpack(average_theta)
                                                                                 , eval_f = private$entropy_foos$objective
                                                                                 , lb = rep(0,2L*length(average_theta))
@@ -433,13 +438,18 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                        , fun = function(mu_list){
                                                          temp_sol <- rep(0, length(theta_extended_init))
                                                          lapply(mu_list, function(mu) {
-                                                           outer_sol <- nloptr::nloptr(x0 = temp_sol
-                                                                                       , eval_f = foos_copy$objective
-                                                                                       , lb = rep(0, length(temp_sol))
-                                                                                       , opts = def_opts
-                                                                                       , return_matrix = return_matrix
-                                                                                       , penalty_value = mu)
-                                                           temp_sol <<- outer_sol$solution
+                                                           outer_sol <- tryCatch(
+                                                             nloptr::nloptr(x0 = temp_sol
+                                                                                         , eval_f = foos_copy$objective
+                                                                                         , lb = rep(0, length(temp_sol))
+                                                                                         , opts = def_opts
+                                                                                         , return_matrix = return_matrix
+                                                                                         , penalty_value = mu)
+                                                             , error = function(e) list(solution=rep(NA_real_, length(temp_sol)))
+                                                           )
+                                                           if(!any(is.na(outer_sol$solution))){
+                                                             temp_sol <<- outer_sol$solution  
+                                                           }
                                                            sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
                                                            sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
                                                            rbind(theta_packed = sol_packed
@@ -468,7 +478,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 cv_criterion <- do.call(cbind, cv_criterion_by_fold)
                                                 
                                                 # average for each penalty (by row)
-                                                cv_criterion <- apply(cv_criterion, 1L, mean)
+                                                cv_criterion <- apply(cv_criterion, 1L, mean, na.rm=TRUE)
                                                 
                                                 # pick penalty where the squared pricing errors are lowest
                                                 best_penalty <- private$penalty_par[which.min(cv_criterion)]
@@ -478,7 +488,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 average_theta <- sapply(coefficients_by_fold, function(cf_list){
                                                   cf_list$theta_compact_matrix[which.min(cv_criterion), ]
                                                 })
-                                                average_theta <- apply(average_theta, 1L, mean)
+                                                average_theta <- apply(average_theta, 1L, mean, na.rm=TRUE)
                                                 approximate_sdf_theta <- nloptr::nloptr(x0 = private$theta_unpack(average_theta)
                                                                                         , eval_f = private$entropy_foos$objective
                                                                                         , lb = rep(0,2L*length(average_theta))
@@ -516,10 +526,10 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 list(theta_vector = private$theta_pack(approximate_sdf_theta)
                                                      , lambda_vector = private$entropy_foos$get_lambda_stored()
                                                      , best_penalty = best_penalty
-                                                     , sdf_rescale = mean(head(approximate_sdf_series,-1))
+                                                     , sdf_rescale = mean(head(approximate_sdf_series,-1), na.rm=TRUE)
                                                      , sdf_value = tail(approximate_sdf_series, 1L)
                                                      , full_sdf_value = tail(full_sdf_series, 1L)
-                                                     , full_sdf_rescale = mean(head(approximate_sdf_series,-1)))
+                                                     , full_sdf_rescale = mean(head(approximate_sdf_series,-1)), na.rm=TRUE)
                                               })
                                               
                                               # assign time series of sdf, norm consts, wts
