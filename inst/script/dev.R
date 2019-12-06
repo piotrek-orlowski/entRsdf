@@ -338,10 +338,11 @@ system.time(
 
 cv_debug <- window_cv_pricing_kernel$new(excess_returns = test_assets
                                          , type = "kullback-leibler"
-                                         , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
-                                         , num_folds = 10L
+                                         # , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
+                                         , penalty_par = zz
+                                         , num_folds = 7L
                                          , sample_type = "expanding"
-                                         , sample_span = 517)
+                                         , sample_span = 180)
 system.time(
   cv_debug$fit()
 )
@@ -349,7 +350,7 @@ system.time(
 
 cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets
                                          , type = "kullback-leibler"
-                                         , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
+                                         , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 10))
                                          , num_folds = 3L
                                          , sample_type = "expanding"
                                          , sample_span = 517
