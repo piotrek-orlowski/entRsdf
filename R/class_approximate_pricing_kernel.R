@@ -118,7 +118,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                           # Folds are assigned by random draw from a uniform 
                                           # dplyr::mutate(foldid = floor(private$num_folds * runif(n())))
                                           # Or consecutively because random does not work for large number of folds
-                                          dplyr::mutate(foldid = floor(1:n()/floor(n()/private$num_folds)))
+                                          dplyr::mutate(foldid = floor(1:n()/ceiling(n()/private$num_folds)))
                                         # Go across folds Thu Oct 17 23:53:14 2019 ------------------------------
                                         all_folds <- 0L:(private$num_folds-1L)
                                         
