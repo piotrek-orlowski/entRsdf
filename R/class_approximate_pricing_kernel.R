@@ -397,6 +397,13 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 fitting_window <- private$window_function(index_)
                                                 # subset returns
                                                 return_df <- return_df[fitting_window,]
+                                                
+                                                # Fri Dec 06 14:04:05 2019 ------------------------------
+                                                # set up unpenalized pricing kernel which will be a reference for the CV
+                                                full_pricing_kernel <- pricing_kernel$new(type = super$get_type()
+                                                                                          , excess_returns = return_df)
+                                                full_pricing_kernel$fit()
+                                                
                                                 # Set up options for optimizer
                                                 def_opts <- nloptr::nl.opts()
                                                 def_opts$algorithm <- "NLOPT_LD_LBFGS"
@@ -479,7 +486,8 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 cv_criterion_by_fold <- lapply(all_folds
                                                                                , private$cv_criterion
                                                                                , return_df = return_df
-                                                                               , coefficients_by_fold = coefficients_by_fold)
+                                                                               , coefficients_by_fold = coefficients_by_fold
+                                                                               , cv_target = full_pricing_kernel$get_sdf_series())
                                                 # put all fold-wise cv curves in a matrix
                                                 # each row = cv crit values for a given lambda
                                                 cv_criterion <- do.call(cbind, cv_criterion_by_fold)
