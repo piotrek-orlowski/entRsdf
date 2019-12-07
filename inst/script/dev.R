@@ -318,17 +318,20 @@ lev_debug$fit()
 
 #### PLAY AROUND ####
 
-zz <- exp(seq(log(0.5), log(0.000001), length.out = 300))
+zz <- exp(seq(log(0.5), log(0.00000001), length.out = 300))
 
-zz <- head(zz[zz<=0.01], 100)
+zz <- tail(zz[zz<=0.03], 200)
 
-cv_debug <- cv_pricing_kernel$new(excess_returns = test_assets
+try(rm(cv_debug))
+
+cv_target <- pricing_kernel$new(excess_returns = test_assets
+                                  , type = "kullback-leibler")
+cv_target$fit()
+
+cv_debug <- cv_pricing_kernel$new(excess_returns = test_assets %>% head(-1)
                                   , type = "kullback-leibler"
                                   , penalty_par = zz
-                                  , num_folds = 5L)
-
-# , penalty_par = exp(seq(log(0.1), log(0.000001), length.out = 120))
-# , penalty_par = seq((0.01), (0.000001), length.out = 120)
+                                  , num_folds = 3L)
 
 system.time(
   cv_debug$fit()  
@@ -336,13 +339,20 @@ system.time(
 
 #### DEV ROLLING ###
 
-cv_debug <- window_cv_pricing_kernel$new(excess_returns = test_assets
+try(rm(cv_debug))
+
+Sys.setenv(NUM_CORES = 8)
+
+cv_target_rolling <- $new(excess_returns = test_assets
+                                , type = "kullback-leibler")
+
+cv_debug <- window_cv_pricing_kernel$new(excess_returns = test_assets %>% head(185)
                                          , type = "kullback-leibler"
                                          # , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
                                          , penalty_par = zz
-                                         , num_folds = 7L
+                                         , num_folds = 3L
                                          , sample_type = "expanding"
-                                         , sample_span = 180)
+                                         , sample_span = 169)
 system.time(
   cv_debug$fit()
 )

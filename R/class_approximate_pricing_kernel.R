@@ -617,7 +617,7 @@ fs_pr_cv_pricing_kernel <- R6::R6Class("fs_pr_cv_pricing_kernel"
                                          }
                                        ))
 
-fs_pr_cv_pricing_kernel <- R6::R6Class("fs_pr_cv_pricing_kernel"
+chi2_cv_pricing_kernel <- R6::R6Class("chi2_cv_pricing_kernel"
                                        , inherit = cv_pricing_kernel
                                        , private = list(
                                          cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
