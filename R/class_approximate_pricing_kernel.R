@@ -583,6 +583,75 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                           , window_function = NULL
                                         ))
 
+fs_pr_cv_pricing_kernel <- R6::R6Class("fs_pr_cv_pricing_kernel"
+                                       , inherit = cv_pricing_kernel
+                                       , private = list(
+                                         cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
+                                           # evaluate the fit on whole sample to have a more precise estimate
+                                           return_matrix <- return_df %>% 
+                                             # dplyr::filter(foldid == fold) %>% 
+                                             dplyr::select(-date, -foldid) %>% 
+                                             as.matrix()
+                                           
+                                           theta_matrix <- coefficients_by_fold[[fold+1L]]$theta_compact_matrix
+                                           # theta_matrix <- apply(theta_matrix, 1L, private$theta_unpack)
+                                           # for each coefficient vector, create the sdf from return sample
+                                           sdf_by_lambda <- apply(X = theta_matrix
+                                                                  , MARGIN = 1L
+                                                                  , FUN = private$entropy_foos$sdf_recovery
+                                                                  , return_matrix = return_matrix)
+                                           # for each penalised sdf in the fold, evaluate pricing errors
+                                           squared_pricing_error <- apply(X = sdf_by_lambda
+                                                                          , MARGIN = 2L
+                                                                          , FUN = function(sdf){
+                                                                            res <- apply(X = return_matrix
+                                                                                         , MARGIN = 2L
+                                                                                         , FUN = function(ret){
+                                                                                           1.0 / length(ret) * crossprod(ret, sdf) # crossprod is fastest for average of products
+                                                                                         })
+                                                                            # here we tried to put the discrepancy of sdf from 1 as criterion, but that does not work out too well
+                                                                            # res <- c(res, mean(sdf - 1.0))
+                                                                            sum(res^2)
+                                                                          })
+                                           squared_pricing_error
+                                         }
+                                       ))
+
+fs_pr_cv_pricing_kernel <- R6::R6Class("fs_pr_cv_pricing_kernel"
+                                       , inherit = cv_pricing_kernel
+                                       , private = list(
+                                         cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
+                                           # evaluate the fit on whole sample to have a more precise estimate
+                                           return_matrix <- return_df %>% 
+                                             # dplyr::filter(foldid == fold) %>% 
+                                             dplyr::select(-date, -foldid) %>% 
+                                             as.matrix()
+                                           
+                                           theta_matrix <- coefficients_by_fold[[fold+1L]]$theta_compact_matrix
+                                           # theta_matrix <- apply(theta_matrix, 1L, private$theta_unpack)
+                                           # for each coefficient vector, create the sdf from return sample
+                                           sdf_by_lambda <- apply(X = theta_matrix
+                                                                  , MARGIN = 1L
+                                                                  , FUN = private$entropy_foos$sdf_recovery
+                                                                  , return_matrix = return_matrix)
+                                           # for each penalised sdf in the fold, evaluate pricing errors
+                                           squared_pricing_error <- apply(X = sdf_by_lambda
+                                                                          , MARGIN = 2L
+                                                                          , FUN = function(sdf){
+                                                                            res <- apply(X = return_matrix
+                                                                                         , MARGIN = 2L
+                                                                                         , FUN = function(ret){
+                                                                                           1.0 / length(ret) * crossprod(ret, sdf) # crossprod is fastest for average of products
+                                                                                         })
+                                                                            # here we tried to put the discrepancy of sdf from 1 as criterion, but that does not work out too well
+                                                                            # res <- c(res, mean(sdf - 1.0))
+                                                                            sum(res^2)
+                                                                          })
+                                           squared_pricing_error
+                                         }
+                                       ))
+
+
 window_lev_pricing_kernel = R6::R6Class("window_lev_pricing_kernel"
                                         , inherit = window_cv_pricing_kernel
                                         , public = list(
