@@ -380,4 +380,6 @@ chi2_rolling <- window_chi2_cv_pricing_kernel$new(excess_returns = test_assets %
                                                   , penalty_par = zz
                                                   , num_folds = 3L
                                                   , sample_type = "expanding"
-                                                  , sample_span = 169)
+                                                  , sample_span = 170)
+
+chi2_rolling$fit()

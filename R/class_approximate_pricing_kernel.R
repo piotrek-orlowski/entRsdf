@@ -689,7 +689,7 @@ chi2_cv_pricing_kernel <- R6::R6Class("chi2_cv_pricing_kernel"
                                                                             # here we tried to put the discrepancy of sdf from 1 as criterion, but that does not work out too well
                                                                             res_var <- var(res)
                                                                             res <- apply(res,2,mean)
-                                                                            res <- t(res) %*% MASS::ginv(res_var) %*% res
+                                                                            res <- tryCatch(t(res) %*% MASS::ginv(res_var) %*% res, error = function(e) NA_real_)
                                                                             res
                                                                           })
                                            squared_pricing_error
@@ -725,7 +725,7 @@ window_chi2_cv_pricing_kernel <- R6::R6Class("window_chi2_cv_pricing_kernel"
                                                                            # here we tried to put the discrepancy of sdf from 1 as criterion, but that does not work out too well
                                                                            res_var <- var(res)
                                                                            res <- apply(res,2,mean)
-                                                                           res <- t(res) %*% MASS::ginv(res_var) %*% res
+                                                                           res <- tryCatch(t(res) %*% MASS::ginv(res_var) %*% res, error = function(e) NA_real_)
                                                                            res
                                                                          })
                                           squared_pricing_error
