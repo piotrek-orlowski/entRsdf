@@ -343,6 +343,19 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                           theta_compact[] <- theta_extended[1L:num_par] - theta_extended[(num_par+1L):(2L*num_par)]
                                           theta_compact
                                       }
+                                      , get_cluster = function(){
+                                        # make cluster and first check environment variable for its size
+                                        if(Sys.getenv("NODELIST") != ""){
+                                          nodelist = unlist(strsplit(Sys.getenv("NODESLIST"), split=" "))
+                                          par_cluster <- parallel::makeCluster(nodeslist, type = "PSOCK") 
+                                        }
+                                        else if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
+                                          par_cluster <- parallel::makeCluster(parallel::detectCores(TRUE))  
+                                        } else {
+                                          par_cluster <- parallel::makeCluster(as.numeric(Sys.getenv("NUM_CORES")))
+                                        }
+                                        par_cluster
+                                      }
                                     ))
 
 lev_pricing_kernel <- R6::R6Class("lev_pricing_kernel"
@@ -372,12 +385,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                           initialize = window_cv_pricing_kernel_constructor
                                           , fit = function(solver_trace = FALSE, ...){
                                               
-                                              # make cluster and first check environment variable for its size
-                                              if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
-                                                par_cluster <- parallel::makeCluster(parallel::detectCores(TRUE))  
-                                              } else {
-                                                par_cluster <- parallel::makeCluster(as.numeric(Sys.getenv("NUM_CORES")))
-                                              }
+                                              par_cluster <- private$get_cluster()
                                               parallel::clusterEvalQ(par_cluster
                                                            , {
                                                              library(entRsdf)
