@@ -326,7 +326,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         squared_fit_error <- apply(X = sdf_by_lambda
                                                                        , MARGIN = 2L
                                                                        , FUN = function(sdf){
-                                                                         sum(abs(sdf - cv_target$sdf))
+                                                                         sum(abs(sdf - cv_target$sdf)^2)
                                                                        })
                                         squared_fit_error
                                       }
@@ -617,8 +617,8 @@ fs_pr_cv_pricing_kernel <- R6::R6Class("fs_pr_cv_pricing_kernel"
                                          }
                                        ))
 
-chi2_cv_pricing_kernel <- R6::R6Class("chi2_cv_pricing_kernel"
-                                       , inherit = cv_pricing_kernel
+window_fs_pr_cv_pricing_kernel <- R6::R6Class("window_pr_cv_pricing_kernel"
+                                       , inherit = window_cv_pricing_kernel
                                        , private = list(
                                          cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
                                            # evaluate the fit on whole sample to have a more precise estimate
@@ -650,6 +650,79 @@ chi2_cv_pricing_kernel <- R6::R6Class("chi2_cv_pricing_kernel"
                                            squared_pricing_error
                                          }
                                        ))
+
+
+chi2_cv_pricing_kernel <- R6::R6Class("chi2_cv_pricing_kernel"
+                                       , inherit = cv_pricing_kernel
+                                       , private = list(
+                                         cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
+                                           # pick returns IN the fold for evaluating the fit
+                                           return_matrix <- return_df %>% 
+                                             dplyr::filter(foldid == fold) %>% 
+                                             dplyr::select(-date, -foldid) %>% 
+                                             as.matrix()
+                                           
+                                           theta_matrix <- coefficients_by_fold[[fold+1L]]$theta_compact_matrix
+                                           # theta_matrix <- apply(theta_matrix, 1L, private$theta_unpack)
+                                           # for each coefficient vector, create the sdf from return sample
+                                           sdf_by_lambda <- apply(X = theta_matrix
+                                                                  , MARGIN = 1L
+                                                                  , FUN = private$entropy_foos$sdf_recovery
+                                                                  , return_matrix = return_matrix)
+                                           # for each penalised sdf in the fold, evaluate pricing errors
+                                           squared_pricing_error <- apply(X = sdf_by_lambda
+                                                                          , MARGIN = 2L
+                                                                          , FUN = function(sdf){
+                                                                            res <- apply(X = return_matrix
+                                                                                         , MARGIN = 2L
+                                                                                         , FUN = function(ret){
+                                                                                           ret * sdf # evaluate RN returns
+                                                                                         })
+                                                                            # here we tried to put the discrepancy of sdf from 1 as criterion, but that does not work out too well
+                                                                            res_var <- var(res)
+                                                                            res <- apply(res,2,mean)
+                                                                            res <- t(res) %*% MASS::ginv(res_var) %*% res
+                                                                            res
+                                                                          })
+                                           squared_pricing_error
+                                         }
+                                       ))
+
+window_chi2_cv_pricing_kernel <- R6::R6Class("window_chi2_cv_pricing_kernel"
+                                      , inherit = window_cv_pricing_kernel
+                                      , private = list(
+                                        cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
+                                          # pick returns IN the fold for evaluating the fit
+                                          return_matrix <- return_df %>% 
+                                            dplyr::filter(foldid == fold) %>% 
+                                            dplyr::select(-date, -foldid) %>% 
+                                            as.matrix()
+                                          
+                                          theta_matrix <- coefficients_by_fold[[fold+1L]]$theta_compact_matrix
+                                          # theta_matrix <- apply(theta_matrix, 1L, private$theta_unpack)
+                                          # for each coefficient vector, create the sdf from return sample
+                                          sdf_by_lambda <- apply(X = theta_matrix
+                                                                 , MARGIN = 1L
+                                                                 , FUN = private$entropy_foos$sdf_recovery
+                                                                 , return_matrix = return_matrix)
+                                          # for each penalised sdf in the fold, evaluate pricing errors
+                                          squared_pricing_error <- apply(X = sdf_by_lambda
+                                                                         , MARGIN = 2L
+                                                                         , FUN = function(sdf){
+                                                                           res <- apply(X = return_matrix
+                                                                                        , MARGIN = 2L
+                                                                                        , FUN = function(ret){
+                                                                                          ret * sdf # evaluate RN returns
+                                                                                        })
+                                                                           # here we tried to put the discrepancy of sdf from 1 as criterion, but that does not work out too well
+                                                                           res_var <- var(res)
+                                                                           res <- apply(res,2,mean)
+                                                                           res <- t(res) %*% MASS::ginv(res_var) %*% res
+                                                                           res
+                                                                         })
+                                          squared_pricing_error
+                                        }
+                                      ))
 
 
 window_lev_pricing_kernel = R6::R6Class("window_lev_pricing_kernel"

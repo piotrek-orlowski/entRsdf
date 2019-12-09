@@ -343,8 +343,12 @@ try(rm(cv_debug))
 
 Sys.setenv(NUM_CORES = 8)
 
-cv_target_rolling <- $new(excess_returns = test_assets
-                                , type = "kullback-leibler")
+cv_target_rolling <- window_pricing_kernel$new(excess_returns = test_assets %>% head(185)
+                                , type = "kullback-leibler"
+                                , sample_type = "expanding"
+                                , sample_span = 169)
+
+cv_target_rolling$fit()
 
 cv_debug <- window_cv_pricing_kernel$new(excess_returns = test_assets %>% head(185)
                                          , type = "kullback-leibler"
@@ -369,3 +373,11 @@ system.time(
   cv_debug$fit()
 )
 
+#### Multi-class ####
+
+chi2_rolling <- window_chi2_cv_pricing_kernel$new(excess_returns = test_assets %>% head(185)
+                                                  , type = "kullback-leibler"
+                                                  , penalty_par = zz
+                                                  , num_folds = 3L
+                                                  , sample_type = "expanding"
+                                                  , sample_span = 169)

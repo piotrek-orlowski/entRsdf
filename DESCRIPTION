@@ -14,7 +14,8 @@ Imports: abind,
   parallel,
   R6,
   Rcpp (>= 1.0.2),
-  tibble
+  tibble,
+  MASS
 LinkingTo: Rcpp, RcppArmadillo
 Suggests:
   anytime,
