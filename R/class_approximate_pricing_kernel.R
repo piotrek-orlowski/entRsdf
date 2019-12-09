@@ -346,8 +346,8 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                       , get_cluster = function(){
                                         # make cluster and first check environment variable for its size
                                         if(Sys.getenv("NODELIST") != ""){
-                                          nodelist = unlist(strsplit(Sys.getenv("NODESLIST"), split=" "))
-                                          par_cluster <- parallel::makeCluster(nodeslist, type = "PSOCK") 
+                                          nodelist = unlist(strsplit(Sys.getenv("NODELIST"), split=" "))
+                                          par_cluster <- parallel::makeCluster(nodelist, type = "PSOCK") 
                                         }
                                         else if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
                                           par_cluster <- parallel::makeCluster(parallel::detectCores(TRUE))  
