@@ -101,6 +101,9 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                                        library(entRsdf)
                                                        if(require("RevoUtilsMath")){
                                                          setMKLthreads(1L) 
+                                                       } else {
+                                                         Sys.Setenv("MKL_NUM_THREADS"=1)
+                                                         Sys.Setenv("OMP_NUM_THREADS"=1)
                                                        }
                                                        NULL
                                                      })
@@ -326,7 +329,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         squared_fit_error <- apply(X = sdf_by_lambda
                                                                        , MARGIN = 2L
                                                                        , FUN = function(sdf){
-                                                                         sum(abs(sdf - cv_target$sdf)^2)
+                                                                         mean(abs(sdf - cv_target$sdf)^2)
                                                                        })
                                         squared_fit_error
                                       }
@@ -392,6 +395,9 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                              library(entRsdf)
                                                              if(require("RevoUtilsMath")){
                                                                setMKLthreads(1L) 
+                                                             } else {
+                                                               Sys.Setenv("MKL_NUM_THREADS"=1)
+                                                               Sys.Setenv("OMP_NUM_THREADS"=1)
                                                              }
                                                              NULL
                                                            })
@@ -404,17 +410,6 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                               
                                               # make a copy of the foos object for export to cluster
                                               foos_copy <- private$entropy_foos$clone(deep = TRUE)
-                                              
-                                              # export the necessary objects to the cluster:
-                                              #  - foos_copy
-                                              #  - theta_extended_init
-                                              #  - def_opts
-                                              #  - return_matrix
-                                              # parallel::clusterExport(par_cluster, c("foos_copy"
-                                              #                                        , "theta_extended_init"
-                                              #                                        , "def_opts"
-                                              #                                        , "return_matrix")
-                                              #                         , envir = environment())
                                               
                                               # make period index
                                               fitting_index <- (private$sample_span + 1L):nrow(private$excess_returns)
@@ -449,8 +444,10 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 set.seed(142L)
                                                 return_df <- return_df %>% 
                                                   # Folds are assigned by random draw from a uniform 
-                                                  dplyr::mutate(foldid = floor(num_folds * runif(n())))
-                                                # cv on limited sample
+                                                  # dplyr::mutate(foldid = floor(num_folds * runif(n())))
+                                                  # or by consecutive subsamples
+                                                  dplyr::mutate(foldid = floor(1:n()/ceiling(n()/private$num_folds)))
+                                                
                                                 # Go across folds Thu Oct 17 23:53:14 2019 ------------------------------
                                                 all_folds <- 0L:(num_folds-1L)
                                                 # Fit glmnet on every fold and save to list
