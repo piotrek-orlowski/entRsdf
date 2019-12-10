@@ -102,8 +102,8 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                                        if(require("RevoUtilsMath")){
                                                          setMKLthreads(1L) 
                                                        } else {
-                                                         Sys.Setenv("MKL_NUM_THREADS"=1)
-                                                         Sys.Setenv("OMP_NUM_THREADS"=1)
+                                                         Sys.setenv("MKL_NUM_THREADS"=1)
+                                                         Sys.setenv("OMP_NUM_THREADS"=1)
                                                        }
                                                        NULL
                                                      })
@@ -396,8 +396,8 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                              if(require("RevoUtilsMath")){
                                                                setMKLthreads(1L) 
                                                              } else {
-                                                               Sys.Setenv("MKL_NUM_THREADS"=1)
-                                                               Sys.Setenv("OMP_NUM_THREADS"=1)
+                                                               Sys.setenv("MKL_NUM_THREADS"=1)
+                                                               Sys.setenv("OMP_NUM_THREADS"=1)
                                                              }
                                                              NULL
                                                            })
