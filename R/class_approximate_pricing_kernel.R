@@ -354,19 +354,18 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                           # Force all cores to log output messages to files
                                           # Check SLURM
                                           # First make directory
+                                          
                                           job_id <- Sys.getenv("SLURM_JOB_ID")
+                                          task_id <- Sys.getenv("SLURM_ARRAY_TASK_ID")
+                                          if(task_id != ""){
+                                            job_id <- sprintf("%s-%s", job_id, task_id)
+                                          }
                                           
                                           dir_name <- sprintf("log-%s", job_id)
                                           dir.create(dir_name)
                                           
                                           main_wd <- getwd()
-                                          print(main_wd)
                                           
-                                          # parallel::clusterExport(par_cluster, "main_wd", envir = environment())
-                                          # parallel::clusterEvalQ(par_cluster, {
-                                          #   job_id <- Sys.getenv("SLURM_JOB_ID")
-                                          #   dir_name <- sprintf("%s/log-%s", main_wd, job_id)
-                                          # })
                                           parallel::clusterApply(par_cluster, seq_along(par_cluster), function(i, dir_name) {
                                             out_file <<- file(sprintf('%s/all-%d.Rout', dir_name, i), open='wt')
                                             sink(out_file)
