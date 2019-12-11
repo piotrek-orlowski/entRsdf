@@ -585,10 +585,10 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                               })
                                               
                                               # assign time series of sdf, norm consts, wts
-                                              approximate_sdf_oos <- sapply(penalised_fits, function(x) x$sdf_value)
+                                              approximate_sdf_oos <- sapply(penalised_fits, function(x) x$sdf_value/x$sdf_rescale)
                                               
                                               # assigne time series of full sdf
-                                              full_sdf_oos <- sapply(penalised_fits, function(x) x$full_sdf_value)
+                                              full_sdf_oos <- sapply(penalised_fits, function(x) x$full_sdf_value/x$full_sdf_rescale)
                                               private$full_sdf_series <- tibble::tibble(date = private$sdf_series$date, sdf = as.numeric(full_sdf_oos))
                                               
                                               pfolio_wts <- sapply(penalised_fits, function(x) as.numeric(x$theta_vector))
