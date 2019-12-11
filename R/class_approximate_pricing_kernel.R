@@ -365,6 +365,8 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                           dir.create(dir_name)
                                           
                                           main_wd <- getwd()
+                                          print(main_wd)
+                                          print(dir_name)
                                           
                                           parallel::clusterApply(par_cluster, seq_along(par_cluster), function(i, dir_name) {
                                             out_file <<- file(sprintf('%s/all-%d.Rout', dir_name, i), open='wt')
