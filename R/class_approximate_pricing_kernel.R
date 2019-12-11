@@ -360,17 +360,18 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                           dir.create(dir_name)
                                           
                                           main_wd <- getwd()
+                                          print(main_wd)
                                           
-                                          parallel::clusterExport(par_cluster, "main_wd", envir = environment())
-                                          parallel::clusterEvalQ(par_cluster, {
-                                            job_id <- Sys.getenv("SLURM_JOB_ID")
-                                            dir_name <- sprintf("%s/log-%s", main_wd, job_id)
-                                          })
+                                          # parallel::clusterExport(par_cluster, "main_wd", envir = environment())
+                                          # parallel::clusterEvalQ(par_cluster, {
+                                          #   job_id <- Sys.getenv("SLURM_JOB_ID")
+                                          #   dir_name <- sprintf("%s/log-%s", main_wd, job_id)
+                                          # })
                                           parallel::clusterApply(par_cluster, seq_along(par_cluster), function(i, dir_name) {
                                             out_file <<- file(sprintf('%s/all-%d.Rout', dir_name, i), open='wt')
                                             sink(out_file)
                                             sink(out_file, type='message')
-                                          }, dir_name = dir_name)
+                                          }, dir_name = sprintf("%s/%s", main_wd, dir_name))
                                         }
                                         else if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
                                           par_cluster <- parallel::makeCluster(parallel::detectCores(TRUE))  
