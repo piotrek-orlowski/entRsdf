@@ -371,7 +371,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                           parallel::clusterApply(par_cluster, seq_along(par_cluster), function(i, dir_name) {
                                             out_file <<- file(sprintf('%s/all-%d.Rout', dir_name, i), open='wt')
                                             sink(out_file)
-                                            sink(out_file, type='message')
+                                            # sink(out_file, type='message')
                                           }, dir_name = sprintf("%s/%s", main_wd, dir_name))
                                         }
                                         else if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
@@ -541,7 +541,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                   cf_list$theta_compact_matrix[which.min(cv_criterion), ]
                                                 })
                                                 average_theta <- apply(average_theta, 1L, mean, na.rm=TRUE)
-                                                approximate_sdf_theta <- nloptr::nloptr(x0 = theta_unpack(average_theta)
+                                                approximate_sdf_theta <- nloptr::nloptr(x0 = theta_unpack(rep(1, length(average_theta))/length(average_theta))
                                                                                         , eval_f = entropy_foos$objective
                                                                                         , lb = rep(0,2L*length(average_theta))
                                                                                         , opts = def_opts
