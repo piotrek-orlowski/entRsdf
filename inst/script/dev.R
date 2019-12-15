@@ -375,11 +375,29 @@ system.time(
 
 #### Multi-class ####
 
-chi2_rolling <- window_chi2_cv_pricing_kernel$new(excess_returns = test_assets %>% head(185)
+chi2_rolling <- window_chi2_cv_pricing_kernel$new(excess_returns = test_assets
                                                   , type = "kullback-leibler"
                                                   , penalty_par = zz
                                                   , num_folds = 3L
                                                   , sample_type = "expanding"
-                                                  , sample_span = 170)
+                                                  , sample_span = 180)
 
-chi2_rolling$fit()
+system.time(chi2_rolling$fit())
+
+
+fs_rolling <- window_fs_pr_cv_pricing_kernel$new(excess_returns = test_assets %>% head(385)
+                                                  , type = "kullback-leibler"
+                                                  , penalty_par = zz
+                                                  , num_folds = 3L
+                                                  , sample_type = "expanding"
+                                                  , sample_span = 373)
+
+system.time(fs_rolling$fit())
+
+cv_reg <- window_cv_pricing_kernel$new(excess_returns = test_assets %>% head(185)
+                                                 , type = "kullback-leibler"
+                                                 , penalty_par = zz
+                                                 , num_folds = 3L
+                                                 , sample_type = "expanding"
+                                                 , sample_span = 182)
+
