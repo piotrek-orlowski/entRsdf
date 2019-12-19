@@ -308,10 +308,8 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                       , complementary_pfolio_wts_df = NULL
                                       , cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
                                         # pick returns IN the fold for evaluating the fit
-                                        return_fold <- return_df %>% 
-                                          dplyr::filter(foldid == fold)
-                                        
-                                        return_matrix <- return_fold %>% 
+                                        return_matrix <- return_df %>% 
+                                          dplyr::filter(foldid == fold) %>% 
                                           dplyr::select(-date, -foldid) %>% 
                                           as.matrix()
                                         
@@ -322,16 +320,20 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                                                , MARGIN = 1L
                                                                , FUN = private$entropy_foos$sdf_recovery
                                                                , return_matrix = return_matrix)
-                                        # for each penalised SDF in the fold, check how far it is from full-sample unpenalised SDF
-                                        cv_target <- cv_target %>% 
-                                          dplyr::inner_join(return_fold %>% select(date))
                                         # for each penalised sdf in the fold, evaluate pricing errors
-                                        squared_fit_error <- apply(X = sdf_by_lambda
+                                        squared_pricing_error <- apply(X = sdf_by_lambda
                                                                        , MARGIN = 2L
                                                                        , FUN = function(sdf){
-                                                                         mean(abs(sdf - cv_target$sdf)^2)
+                                                                         res <- apply(X = return_matrix
+                                                                                      , MARGIN = 2L
+                                                                                      , FUN = function(ret){
+                                                                                        1.0 / length(ret) * crossprod(ret, sdf) # crossprod is fastest for average of products
+                                                                                      })
+                                                                         # here we tried to put the discrepancy of sdf from 1 as criterion, but that does not work out too well
+                                                                         # res <- c(res, mean(sdf - 1.0))
+                                                                         sum(res^2)
                                                                        })
-                                        squared_fit_error
+                                        squared_pricing_error
                                       }
                                       , theta_unpack = function(theta_compact){
                                           num_par <- length(theta_compact)
