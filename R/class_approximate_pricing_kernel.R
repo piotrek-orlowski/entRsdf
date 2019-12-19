@@ -92,7 +92,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         
                                         # make cluster and first check environment variable for its size
                                         if(is.na(as.numeric(Sys.getenv("NUM_CORES")))){
-                                          par_cluster <- parallel::makeCluster(detectCores(TRUE))  
+                                          par_cluster <- parallel::makeCluster(parallel::detectCores(TRUE))  
                                         } else {
                                           par_cluster <- parallel::makeCluster(as.numeric(Sys.getenv("NUM_CORES")))
                                         }
@@ -773,7 +773,7 @@ window_lev_pricing_kernel = R6::R6Class("window_lev_pricing_kernel"
                                           }
                                         )
                                         , private = list(
-                                          cv_criterion = function(fold, return_df, coefficients_by_fold){
+                                          cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
                                             # recover portfolio coefficients (matrix size of num assets x penalty par)
                                             loc_coefs <- coefficients_by_fold[[fold+1]]$theta_compact_matrix
                                             
