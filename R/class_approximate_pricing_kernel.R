@@ -542,8 +542,8 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 average_theta <- sapply(coefficients_by_fold, function(cf_list){
                                                   cf_list$theta_compact_matrix[which.min(cv_criterion), ]
                                                 })
-                                                average_theta <- apply(average_theta, 1L, mean, na.rm=TRUE)
-                                                approximate_sdf_theta <- nloptr::nloptr(x0 = theta_unpack(rep(1, length(average_theta))/length(average_theta))
+                                                average_theta <- apply(average_theta, 1L, mean, na.rm = TRUE)
+                                                approximate_sdf_theta <- nloptr::nloptr(x0 = theta_unpack(rep(0, length(average_theta))/length(average_theta))
                                                                                         , eval_f = entropy_foos$objective
                                                                                         , lb = rep(0,2L*length(average_theta))
                                                                                         , opts = def_opts
