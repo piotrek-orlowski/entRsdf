@@ -61,7 +61,7 @@ distance_et_functions <- R6::R6Class("distance_et_functions"
                                           
                                           # Check if there is a pre-estimated lambda (to get a starting value for the first optimisation)
                                           if(is.null(private$lambda_opt)){
-                                            lambda_opt <- rep(1/ncol(return_matrix), ncol(return_matrix))
+                                            lambda_opt <- rep(0, ncol(return_matrix))
                                           } else {
                                             lambda_opt <- private$lambda_opt
                                           }
