@@ -504,8 +504,6 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                         )
                                                        if(!any(is.na(outer_sol$solution))){
                                                          temp_sol <<- outer_sol$solution  
-                                                       } else {
-                                                         print("NAs registered with final date %s fold %d", max(return_df$date), fold)
                                                        }
                                                        sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
                                                        sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
@@ -545,7 +543,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                   cf_list$theta_compact_matrix[which.min(cv_criterion), ]
                                                 })
                                                 average_theta <- apply(average_theta, 1L, mean, na.rm = TRUE)
-                                                approximate_sdf_theta <- tryCatch(nloptr::nloptr(x0 = theta_unpack(c(rep(0.1, length(average_theta)/2), rep(0, length(average_theta)/2)))
+                                                approximate_sdf_theta <- nloptr::nloptr(x0 = theta_unpack(rep(0, length(average_theta))/length(average_theta))
                                                                                         , eval_f = entropy_foos$objective
                                                                                         , lb = rep(0,2L*length(average_theta))
                                                                                         , opts = def_opts
@@ -553,10 +551,6 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                                                           dplyr::select(-date, -foldid) %>% 
                                                                                           as.matrix()
                                                                                         , penalty_value = best_penalty)$solution
-                                                                                  , error = function(e){
-                                                                                    print("Final optimisation error with final date %s", max(return_df$date), fold)
-                                                                                    return(NA_real_, length(average_theta))
-                                                                                  })
                                                 
                                                 # generate penalised SDF
                                                 approximate_sdf_series <- entropy_foos$sdf_recovery(theta_vector = theta_pack(approximate_sdf_theta)
