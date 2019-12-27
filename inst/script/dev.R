@@ -318,9 +318,9 @@ lev_debug$fit()
 
 #### PLAY AROUND ####
 
-zz <- exp(seq(log(0.5), log(0.00000001), length.out = 300))
+zz <- exp(seq(log(0.1), log(0.000001), length.out = 20))
 
-zz <- tail(zz[zz<=0.03], 200)
+# zz <- tail(zz[zz<=0.03], 200)
 
 try(rm(cv_debug))
 
@@ -341,12 +341,12 @@ system.time(
 
 try(rm(cv_debug))
 
-Sys.setenv(NUM_CORES = 8)
+Sys.setenv(NUM_CORES = 4)
 
 cv_target_rolling <- window_pricing_kernel$new(excess_returns = test_assets %>% head(185)
                                 , type = "kullback-leibler"
                                 , sample_type = "expanding"
-                                , sample_span = 169)
+                                , sample_span = 181)
 
 cv_target_rolling$fit()
 
@@ -356,19 +356,19 @@ cv_debug <- window_cv_pricing_kernel$new(excess_returns = test_assets %>% head(1
                                          , penalty_par = zz
                                          , num_folds = 3L
                                          , sample_type = "expanding"
-                                         , sample_span = 169)
+                                         , sample_span = 181)
 system.time(
   cv_debug$fit()
 )
 
 
-cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets
+cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets %>% head(180+67+1)
                                          , type = "kullback-leibler"
-                                         , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 10))
+                                         , penalty_par = zz
                                          , num_folds = 3L
                                          , sample_type = "expanding"
-                                         , sample_span = 517
-                                         , maximum_leverage = 20)
+                                         , sample_span = 180+67
+                                         , maximum_leverage = 100)
 system.time(
   cv_debug$fit()
 )
@@ -394,10 +394,10 @@ fs_rolling <- window_fs_pr_cv_pricing_kernel$new(excess_returns = test_assets %>
 
 system.time(fs_rolling$fit())
 
-cv_reg <- window_cv_pricing_kernel$new(excess_returns = test_assets %>% head(185)
+cv_reg <- window_cv_pricing_kernel$new(excess_returns = test_assets %>% head(188)
                                                  , type = "kullback-leibler"
                                                  , penalty_par = zz
                                                  , num_folds = 3L
                                                  , sample_type = "expanding"
-                                                 , sample_span = 182)
+                                                 , sample_span = 180)
 

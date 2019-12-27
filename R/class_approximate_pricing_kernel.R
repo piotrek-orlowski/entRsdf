@@ -530,12 +530,13 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 # put all fold-wise cv curves in a matrix
                                                 # each row = cv crit values for a given lambda
                                                 cv_criterion <- do.call(cbind, cv_criterion_by_fold)
+                                                cv_criterion <- apply(cv_criterion, 2, function(x) x/x[1])
                                                 
                                                 # average for each penalty (by row)
-                                                cv_criterion <- apply(cv_criterion, 1L, mean, na.rm=TRUE)
+                                                cv_criterion <- apply(cv_criterion, 1L, mean, na.rm = TRUE)
                                                 
                                                 # pick penalty where the squared pricing errors are lowest
-                                                best_penalty <- penalty_par[which.min(cv_criterion)]
+                                                best_penalty <- penalty_par[max(which(cv_criterion == min(cv_criterion)))]
                                                 
                                                 # estimate model for that penalty on all data
                                                 # start from average theta for that penalty
