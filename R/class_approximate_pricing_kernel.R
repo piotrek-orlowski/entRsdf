@@ -21,6 +21,27 @@ cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date =
   
   private$best_penalty_par <- NA_real_
   
+  # set up optimisation function
+  private$optim_fun <- function(mu, envir) {
+    outer_sol <- tryCatch(
+      nloptr::nloptr(x0 = eval(quote(temp_sol), envir = envir)
+                     , eval_f = eval(quote(foos_copy$objective), envir = envir)
+                     , lb = rep(0, length(eval(quote(temp_sol), envir = envir)))
+                     , opts = eval(quote(def_opts), envir = envir)
+                     , return_matrix = eval(quote(return_matrix), envir = parent.env(envir))
+                     , penalty_value = mu)
+      , error = function(e) list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+    )
+    if(!any(is.na(outer_sol))){
+      temp_sol <<- outer_sol$solution  
+    }
+    return_matrix <- eval(quote(return_matrix), envir = parent.env(envir))
+    sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
+    sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
+    rbind(theta_packed = sol_packed
+          , lambda_full = eval(quote(foos_copy$get_lambda_stored()), envir = envir))
+  }
+  
   # Set up fields specific to the cross-validated kernel:
   # Number of folds and penalty parameter (lambda) vector
   private$num_folds <- num_folds
@@ -167,24 +188,8 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                              , X = penalty_split
                                              , fun = function(mu_list){
                                                 temp_sol <- rep(0, length(theta_extended_init))
-                                                lapply(mu_list, function(mu) {
-                                                  outer_sol <- tryCatch(
-                                                      nloptr::nloptr(x0 = temp_sol
-                                                                              , eval_f = foos_copy$objective
-                                                                              , lb = rep(0, length(temp_sol))
-                                                                              , opts = def_opts
-                                                                              , return_matrix = return_matrix
-                                                                              , penalty_value = mu)
-                                                  , error = function(e) rep(NA_real_, length(temp_sol))
-                                                  )
-                                                  if(!any(is.na(outer_sol))){
-                                                    temp_sol <<- outer_sol$solution  
-                                                  }
-                                                  sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
-                                                  sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
-                                                  rbind(theta_packed = sol_packed
-                                                        , lambda_full = foos_copy$get_lambda_stored())
-                                                }
+                                                loc_env <- environment()
+                                                lapply(mu_list, private$optim_fun, envir = loc_env
                                                 )
                                                })
                                             
@@ -306,6 +311,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                       , entropy_foos = NULL
                                       , complementary_pfolio_wts = NULL
                                       , complementary_pfolio_wts_df = NULL
+                                      , optim_fun = NULL
                                       , cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
                                         # pick returns IN the fold for evaluating the fit
                                         return_matrix <- return_df %>% 
