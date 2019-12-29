@@ -311,8 +311,8 @@ cv_debug$fit()
 lev_debug <- lev_pricing_kernel$new(excess_returns = test_assets[,1:7]
                                     , type = "kullback-leibler"
                                     , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
-                                    , num_folds = 3L
-                                    , maximum_leverage = 5)
+                                    , num_folds = 1L
+                                    , maximum_leverage = 25)
 
 lev_debug$fit()
 
@@ -362,13 +362,11 @@ system.time(
 )
 
 
-cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets %>% head(180+67+1)
+cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets
                                          , type = "kullback-leibler"
-                                         , penalty_par = zz
-                                         , num_folds = 3L
                                          , sample_type = "expanding"
-                                         , sample_span = 180+67
-                                         , maximum_leverage = 100)
+                                         , sample_span = 180
+                                         , maximum_leverage = 50)
 system.time(
   cv_debug$fit()
 )
