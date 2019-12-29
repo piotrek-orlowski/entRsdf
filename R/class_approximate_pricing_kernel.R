@@ -34,7 +34,7 @@ cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date =
       , error = function(e) list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
     )
     if(!any(is.na(outer_sol))){
-      temp_sol <<- outer_sol$solution  
+      # temp_sol <<- outer_sol$solution  
     }
     # return_matrix <- eval(quote(return_matrix), envir = parent.env(envir))
     return_matrix <- eval(quote(return_matrix), envir = envir)
@@ -538,7 +538,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                               # apply over index:
                                               penalised_fits <- parallel::parLapply(cl = par_cluster
                                               # penalised_fits <- lapply(
-                                                                       , X = fitting_index
+                                                                       , fitting_index
                                                                        , return_df = return_df
                                                                        , window_function = private$window_function
                                                                        , num_folds = private$num_folds
@@ -549,7 +549,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                                        , theta_unpack = private$theta_unpack
                                                                        , theta_pack = private$theta_pack
                                                                        , optim_crit = private$optim_fun
-                                                                       , fun = function(index_, return_df, window_function, num_folds, entropy_foos, optimizer_opts, penalty_par, cv_criterion, theta_unpack, theta_pack, optim_crit){
+                                                                       , function(index_, return_df, window_function, num_folds, entropy_foos, optimizer_opts, penalty_par, cv_criterion, theta_unpack, theta_pack, optim_crit){
                                                                          
                                                 full_return_df <- return_df
                                                 # make window indexer
@@ -572,7 +572,8 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                   dplyr::mutate(foldid = floor(1:n()/ceiling(n()/private$num_folds)))
                                                 
                                                 # Go across folds Thu Oct 17 23:53:14 2019 ------------------------------
-                                                all_folds <- 0L:(num_folds-1L)
+                                                unique_foldid <- unique(return_df$foldid)
+                                                all_folds <- seq(from = min(unique_foldid), to = max(unique_foldid), by = 1)
                                                 
                                                 if(private$num_folds > 1){
                                                   # Fit on every fold and save to list
