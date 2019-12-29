@@ -28,14 +28,16 @@ cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date =
                      , eval_f = eval(quote(foos_copy$objective), envir = envir)
                      , lb = rep(0, length(eval(quote(temp_sol), envir = envir)))
                      , opts = eval(quote(def_opts), envir = envir)
-                     , return_matrix = eval(quote(return_matrix), envir = parent.env(envir))
+                     # , return_matrix = eval(quote(return_matrix), envir = parent.env(envir))
+                     , return_matrix = eval(quote(return_matrix), envir = envir)
                      , penalty_value = mu)
       , error = function(e) list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
     )
     if(!any(is.na(outer_sol))){
       temp_sol <<- outer_sol$solution  
     }
-    return_matrix <- eval(quote(return_matrix), envir = parent.env(envir))
+    # return_matrix <- eval(quote(return_matrix), envir = parent.env(envir))
+    return_matrix <- eval(quote(return_matrix), envir = envir)
     sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
     sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
     rbind(theta_packed = sol_packed
@@ -46,6 +48,44 @@ cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date =
   # Number of folds and penalty parameter (lambda) vector
   private$num_folds <- num_folds
   private$penalty_par <- penalty_par
+}
+
+lev_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date = anytime::anydate(NA_real_))
+                                           , type = c("kullback-leibler", "exponential-tilting", "cressie-read")
+                                           , maximum_leverage){
+  super$initialize(excess_returns = excess_returns
+                   , type = type
+                   , penalty_par = 0
+                   , num_folds = 1)
+  private$maximum_leverage <- maximum_leverage
+  
+  # set up optimisation function
+  private$optim_fun <- function(mu, envir) {
+    maximum_leverage <- eval(quote(private$maximum_leverage), envir = envir)
+    def_opts <- eval(quote(def_opts), envir = envir)
+    def_opts$algorithm <- "NLOPT_LD_SLSQP"
+    outer_sol <- tryCatch(
+      nloptr::nloptr(x0 = eval(quote(temp_sol), envir = envir)
+                     , eval_f = eval(quote(foos_copy$objective), envir = envir)
+                     , lb = rep(0, length(eval(quote(temp_sol), envir = envir)))
+                     , eval_g_ineq = function(theta_vector, return_matrix, penalty_value){
+                       list(constraints = sum(theta_vector) - maximum_leverage
+                            , jacobian = matrix(1, ncol = length(theta_vector), nrow = 1))
+                     }
+                     , opts = def_opts
+                     , return_matrix = eval(quote(return_matrix), envir = envir)
+                     , penalty_value = 0)
+      , error = function(e) list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+    )
+    if(!any(is.na(outer_sol))){
+      temp_sol <<- outer_sol$solution  
+    }
+    return_matrix <- eval(quote(return_matrix), envir = envir)
+    sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
+    sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
+    rbind(theta_packed = sol_packed
+          , lambda_full = eval(quote(foos_copy$get_lambda_stored()), envir = envir))
+  }
 }
 
 window_cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date = anytime::anydate(NA_real_))
@@ -153,93 +193,105 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         # for each fold, and along the penalty path, fit SDFs and save:
                                         # 1) theta
                                         # 2) lambda for each theta
-                                        coefficients_by_fold <- lapply(all_folds
-                                         , function(fold){
-                                           # for fitting you use data NOT in the fold
-                                           return_matrix <- return_df %>% 
-                                             dplyr::filter(foldid != fold) %>% 
-                                             dplyr::select(-date, -foldid) %>% 
-                                             as.matrix()
-                                           
-                                           theta_extended_init <- rep(0.0, 2L * ncol(return_matrix))
-                                           
-                                           # matrices for storing thetas and lambdas
-                                           theta_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
-                                           lambda_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
-                                           
-                                           # make a copy of the foos object for export to cluster
-                                           foos_copy <- private$entropy_foos$clone(deep = TRUE)
-                                           
-                                           # export the necessary objects to the cluster:
-                                           #  - foos_copy
-                                           #  - theta_extended_init
-                                           #  - def_opts
-                                           #  - return_matrix
-                                           parallel::clusterExport(par_cluster, c("foos_copy"
-                                                                                  , "theta_extended_init"
-                                                                                  , "def_opts"
-                                                                                  , "return_matrix")
-                                                                   , envir = environment())
-                                           
-                                           penalty_split <- split(private$penalty_par, ceiling(seq_along(private$penalty_par)/ceiling(length(private$penalty_par)/length(par_cluster))))
-                                           
-                                           optimisation_list <- parallel::parLapplyLB(
-                                             cl = par_cluster
-                                             , X = penalty_split
-                                             , fun = function(mu_list){
-                                                temp_sol <- rep(0, length(theta_extended_init))
-                                                loc_env <- environment()
-                                                lapply(mu_list, private$optim_fun, envir = loc_env
-                                                )
-                                               })
-                                            
-                                            optimisation_coeffs <- abind::abind(lapply(optimisation_list, abind::abind, along = 3L), along = 3L)
-                                            
-                                            theta_store[,] <- t(optimisation_coeffs[1L,,])
-                                            lambda_store[,] <- t(optimisation_coeffs[2L,,])
-                                             
-                                           return(list(theta_compact_matrix = theta_store
-                                                       , lambda_matrix = lambda_store))
+                                        if(private$num_folds > 1){
+                                          coefficients_by_fold <- lapply(all_folds
+                                                                         , function(fold){
+                                                                           # for fitting you use data NOT in the fold
+                                                                           return_matrix <- return_df %>% 
+                                                                             dplyr::filter(foldid != fold) %>% 
+                                                                             dplyr::select(-date, -foldid) %>% 
+                                                                             as.matrix()
+                                                                           
+                                                                           theta_extended_init <- rep(0.0, 2L * ncol(return_matrix))
+                                                                           
+                                                                           # matrices for storing thetas and lambdas
+                                                                           theta_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
+                                                                           lambda_store <- matrix(0, length(private$penalty_par), ncol(return_matrix))
+                                                                           
+                                                                           # make a copy of the foos object for export to cluster
+                                                                           foos_copy <- private$entropy_foos$clone(deep = TRUE)
+                                                                           
+                                                                           # export the necessary objects to the cluster:
+                                                                           #  - foos_copy
+                                                                           #  - theta_extended_init
+                                                                           #  - def_opts
+                                                                           #  - return_matrix
+                                                                           parallel::clusterExport(par_cluster, c("foos_copy"
+                                                                                                                  , "theta_extended_init"
+                                                                                                                  , "def_opts"
+                                                                                                                  , "return_matrix")
+                                                                                                   , envir = environment())
+                                                                           
+                                                                           penalty_split <- split(private$penalty_par, ceiling(seq_along(private$penalty_par)/ceiling(length(private$penalty_par)/length(par_cluster))))
+                                                                           
+                                                                           # optimisation_list <- parallel::parLapplyLB(
+                                                                           #   cl = par_cluster
+                                                                           #   , X = penalty_split
+                                                                           #   , fun = function(mu_list){
+                                                                           #      temp_sol <- rep(0, length(theta_extended_init))
+                                                                           #      loc_env <- environment()
+                                                                           #      lapply(mu_list, private$optim_fun, envir = loc_env
+                                                                           #      )
+                                                                           #     })
+                                                                           
+                                                                           optimisation_list <- lapply(X = penalty_split
+                                                                                                       , FUN = function(mu_list){
+                                                                                                         temp_sol <- rep(0, length(theta_extended_init))
+                                                                                                         loc_env <- environment()
+                                                                                                         lapply(mu_list, private$optim_fun, envir = loc_env
+                                                                                                         )
+                                                                                                       })
+                                                                           
+                                                                           optimisation_coeffs <- abind::abind(lapply(optimisation_list, abind::abind, along = 3L), along = 3L)
+                                                                           
+                                                                           theta_store[,] <- t(optimisation_coeffs[1L,,])
+                                                                           lambda_store[,] <- t(optimisation_coeffs[2L,,])
+                                                                           
+                                                                           return(list(theta_compact_matrix = theta_store
+                                                                                       , lambda_matrix = lambda_store))
                                                                          })
-                                        # Based on coefficients estimated on each fold, construct SDFs from the data that was left out from the estimation, and use them to price the fold
-                                        # Each element of this list contains a vector of sums of squared pricing errors (across assets) for all lambdas
-                                        # These are fold-wise cv curves
-                                        cv_criterion_by_fold <- lapply(all_folds
-                                                                      , private$cv_criterion
-                                                                      , return_df = return_df
-                                                                      , coefficients_by_fold = coefficients_by_fold
-                                                                      , cv_target = full_pricing_kernel$get_sdf_series())
+                                          # Based on coefficients estimated on each fold, construct SDFs from the data that was left out from the estimation, and use them to price the fold
+                                          # Each element of this list contains a vector of sums of squared pricing errors (across assets) for all lambdas
+                                          # These are fold-wise cv curves
+                                          cv_criterion_by_fold <- lapply(all_folds
+                                                                         , private$cv_criterion
+                                                                         , return_df = return_df
+                                                                         , coefficients_by_fold = coefficients_by_fold
+                                                                         , cv_target = full_pricing_kernel$get_sdf_series())
+                                          
+                                          # put all fold-wise cv curves in a matrix
+                                          # each row = cv crit values for a given lambda
+                                          cv_criterion <- do.call(cbind, cv_criterion_by_fold)
+                                          
+                                          # average for each penalty (by row)
+                                          cv_criterion <- apply(cv_criterion, 1L, mean, na.rm=TRUE)
+                                          
+                                          # pick penalty where the squared pricing errors are lowest
+                                          best_penalty <- private$penalty_par[which.min(cv_criterion)]  
+                                        } else {
+                                          best_penalty <- private$penalty_par
+                                        }
                                         
-                                        # put all fold-wise cv curves in a matrix
-                                        # each row = cv crit values for a given lambda
-                                        cv_criterion <- do.call(cbind, cv_criterion_by_fold)
+                                        # set variables to be passed to optimisation function
+                                        return_matrix <- return_df %>% 
+                                          dplyr::select(-date, -foldid) %>% 
+                                          as.matrix()
                                         
-                                        # average for each penalty (by row)
-                                        cv_criterion <- apply(cv_criterion, 1L, mean, na.rm=TRUE)
+                                        foos_copy <- private$entropy_foos
                                         
-                                        # pick penalty where the squared pricing errors are lowest
-                                        best_penalty <- private$penalty_par[which.min(cv_criterion)]
+                                        temp_sol <- rep(0, 2 * ncol(return_matrix))
+                                        
+                                        envir <- environment()
                                         
                                         # estimate model for that penalty on all data
-                                        # start from average theta for that penalty
-                                        average_theta <- sapply(coefficients_by_fold, function(cf_list){
-                                          cf_list$theta_compact_matrix[which.min(cv_criterion), ]
-                                        })
-                                        average_theta <- apply(average_theta, 1L, mean, na.rm=TRUE)
-                                        approximate_sdf_theta <- nloptr::nloptr(x0 = private$theta_unpack(-full_pricing_kernel$get_pfolio_wts())
-                                                                                , eval_f = private$entropy_foos$objective
-                                                                                , lb = rep(0,2L*length(average_theta))
-                                                                                , opts = def_opts
-                                                                                , return_matrix = return_df %>% 
-                                                                                  dplyr::select(-date, -foldid) %>% 
-                                                                                  as.matrix()
-                                                                                , penalty_value = best_penalty)$solution
+                                        approximate_sdf_theta <- private$optim_fun(mu = best_penalty
+                                                                                   , envir = envir)["theta_packed",]
+                                        
+                                        approximate_sdf_theta <- private$theta_unpack(approximate_sdf_theta)
                                         
                                         # generate penalised SDF
                                         approximate_sdf_series <- private$entropy_foos$sdf_recovery(theta_vector = private$theta_pack(approximate_sdf_theta)
-                                                                                                    , return_matrix = return_df %>% 
-                                                                                                      dplyr::select(-date, -foldid) %>% 
-                                                                                                      as.matrix())
+                                                                                                    , return_matrix = return_matrix)
                                         # normalise penalised SDF and assign to slot
                                         private$sdf_series$sdf <- approximate_sdf_series[,1L] # / mean(approximate_sdf_series)
                                         
@@ -395,13 +447,10 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
 lev_pricing_kernel <- R6::R6Class("lev_pricing_kernel"
                                   , inherit = cv_pricing_kernel
                                   , public = list(
-                                    initialize = function(maximum_leverage, ...){
-                                      super$initialize(...)
-                                      private$maximum_leverage <- maximum_leverage
-                                    }
+                                    initialize = lev_pricing_kernel_constructor
                                   )
                                   , private = list(
-                                    cv_criterion = function(fold, return_df, coefficients_by_fold){
+                                    cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
                                       # recover portfolio coefficients (matrix size of num assets x penalty par)
                                       loc_coefs <- coefficients_by_fold[[fold + 1L]]$theta_compact_matrix
                                       # calculate excess leverage
