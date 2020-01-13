@@ -53,6 +53,85 @@ et_functions <- R6::R6Class("et_functions"
                                , private = list(
                                  description = "Functions for fitting and recovering exponential-tilting SDFs. \nThey correspond to setting power = 0 in the Cressie-Read function family."
                                ))
+cressie_read_functions <- R6::R6Class("cressie_read_functions"
+                                      , inherit = entropy_functions
+                                      , public = list(
+                                        initialize = function(cressie_read_power
+                                                              , sdf_mean){
+                                          if(cressie_read_power %in% c(-1, 0)){
+                                            stop("This function is for powers different from -1 and 0. If you wish to use those, please use et_functions or entropy_functions.")
+                                          }
+                                          private$cr_power <-  cressie_read_power
+                                          private$sdf_average <- sdf_mean
+                                        }
+                                        , objective = function(theta_vector, return_matrix){
+                                          sdf_expect <- private$sdf_average
+                                          cr_pow <- private$cr_power
+                                          # return_matrix <- return_matrix - 1.0 / sdf_expect # because excess returns
+                                          res <- cr_pow * return_matrix %*% theta_vector
+                                          res <- res + sdf_expect^cr_pow
+                                          res <- - 1.0 / (1.0 + cr_pow) * res^((cr_pow + 1.0)/cr_pow)
+                                          res <- mean(res)
+                                          return(-res)
+                                        }
+                                        , gradient = function(theta_vector, return_matrix){
+                                          sdf_expect <- private$sdf_average
+                                          cr_pow <- private$cr_power
+                                          # return_matrix <- return_matrix - 1.0 / sdf_expect # because excess returns
+                                          res <- cr_pow * return_matrix %*% theta_vector
+                                          res <- res + sdf_expect^cr_pow
+                                          res <- -res^(1.0 / cr_pow)
+                                          res <- apply(return_matrix, 2, function(x) res * x)
+                                          res <- apply(res, 2, mean)
+                                          return(-res)
+                                        }
+                                        , hessian = function(theta_vector, return_matrix){
+                                          sdf_expect <- private$sdf_average
+                                          cr_pow <- private$cr_power
+                                          # return_matrix <- return_matrix - 1.0 / sdf_expect # because excess returns
+                                          res <- cr_pow * return_matrix %*% theta_vector
+                                          res <- res + sdf_expect^cr_pow
+                                          res <- -res^((1.0 - cr_pow)/cr_pow)
+                                          res <- apply(cbind(res, return_matrix), 1, function(x) x[1] * (x[-1] %*% t(x[-1])))
+                                          res <- array(res, c(length(theta_vector), length(theta_vector), nrow(return_matrix)))
+                                          res <- apply(res, c(1,2), mean)
+                                          return(-res)
+                                        }
+                                        , sdf_recovery = function(theta_vector, return_matrix){
+                                          sdf_expect <- private$sdf_average
+                                          cr_pow <- private$cr_power
+                                          # return_matrix <- return_matrix - 1.0 / sdf_expect # because excess returns
+                                          res <- cr_pow * return_matrix %*% theta_vector
+                                          res <- res + sdf_expect^cr_pow
+                                          res <- res^(1.0 / cr_pow)
+                                          res <- sdf_expect * res / mean(res)
+                                          return(res)
+                                        }
+                                        , get_power = function(){
+                                          return(private$cr_power)
+                                        }
+                                        , get_risk_free_return = function(){
+                                          return(1.0/private$sdf_average)
+                                        }
+                                        , set_power = function(new_power){
+                                          private$cr_power <- new_power
+                                          invisible(self)
+                                        }
+                                        , set_risk_free_return = function(new_risk_free_return){
+                                          private$sdf_average <- 1.0 / new_risk_free_return
+                                          invisible(self)
+                                        }
+                                        , set_sdf_mean = function(new_sdf_mean){
+                                          private$sdf_average <- new_sdf_mean
+                                          invisible(self)
+                                        }
+                                      )
+                                      , private = list(
+                                        cr_power = -0.5 # Hellinger
+                                        , sdf_average = 1.0
+                                        , description = "Functions for fitting and recovering general Cressie-Read SDFs. \nThey correspond to any power different from -1 or 0 in the Cressie-Read function family."
+                                      )
+                                      )
 
 distance_et_functions <- R6::R6Class("distance_et_functions"
                                      , inherit = entropy_functions

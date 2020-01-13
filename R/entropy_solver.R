@@ -19,11 +19,19 @@ solve_entropy_problem <- function(entropy_foos
                                   , solver_trace = FALSE
                                   , ...){
   
+  if(inherits(entropy_foos, "cressie_read_functions")){
+    pos_ret_constraints <- cccp::nnoc(G = -excess_return_matrix
+                                      , h = matrix(0, nrow = nrow(excess_return_matrix), ncol = 1))
+  } else {
+    pos_ret_constraints <- list()
+  }
+  
   optimisation_result <- cccp::cccp(f0 = function(x) entropy_foos$objective(x, excess_return_matrix)
                                     , g0 = function(x) entropy_foos$gradient(x, excess_return_matrix)
                                     , h0 = function(x) entropy_foos$hessian(x, excess_return_matrix)
                                     , x0 = theta_vector_init
-                                    , optctrl = cccp::ctrl(trace = solver_trace, ...))
+                                    , optctrl = cccp::ctrl(trace = solver_trace, ...)
+                                    , cList = pos_ret_constraints)
   
   if(optimisation_result$status == "optimal"){
     

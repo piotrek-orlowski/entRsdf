@@ -1,5 +1,6 @@
 pricing_kernel_constructor <- function(type = c("kullback-leibler", "exponential-tilting", "cressie-read")
-                                       , excess_returns = tibble::tibble(date = anytime::anydate(NA_real_))){
+                                       , excess_returns = tibble::tibble(date = anytime::anydate(NA_real_))
+                                       , ...){
   
   # Thu Oct 17 18:44:41 2019 ------------------------------
   # make sure excess returns are a wide data frame with column "date" and numeric contents
@@ -18,7 +19,7 @@ pricing_kernel_constructor <- function(type = c("kullback-leibler", "exponential
   private$entropy_foos <- switch(type
                               , "kullback-leibler" = et_functions$new()
                               , "exponential-tilting" = logx_functions$new()
-                              , "cressie-read" = cressie_read_functions$new())
+                              , "cressie-read" = cressie_read_functions$new(...))
   # prepare data frame to hold sdf series
   private$sdf_series <- tibble::tibble(date = excess_returns$date
                                     , sdf = NA_real_)
