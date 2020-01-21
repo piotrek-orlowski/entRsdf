@@ -145,9 +145,9 @@ pricing_kernel <- R6::R6Class("pricing_kernel"
                                 }
                                 , fit = function(solver_trace = FALSE, ...){
                                   if(any(is.na(private$pfolio_wts)) | any(is.na(private$normalizing_constant))){
-                                    const_and_wts <- rep(1.0, ncol(private$excess_returns)) / ncol(private$excess_returns)
+                                    const_and_wts <- rep(1.0, ncol(private$excess_returns) - 1L) / (ncol(private$excess_returns) - 1L)
                                   } else {
-                                    const_and_wts <- c(private$normalizing_constant, private$pfolio_wts)
+                                    const_and_wts <- c(private$pfolio_wts)
                                   }
                                   # Convert returns to matrix Thu Oct 17 18:54:04 2019 ------------------------------
                                   return_matrix <- private$excess_returns %>% 
@@ -163,11 +163,11 @@ pricing_kernel <- R6::R6Class("pricing_kernel"
                                                                          , ...
                                                                          )
                                   
-                                  private$normalizing_constant <- const_and_wts[1L]
-                                  private$pfolio_wts <- const_and_wts[-1L]
-                                  private$pfolio_wts_df$weight <- const_and_wts[-1L]
+                                  private$pfolio_wts <- const_and_wts
+                                  private$pfolio_wts_df$weight <- const_and_wts
                                   private$objective <- private$entropy_foos$objective(const_and_wts, return_matrix)
                                   private$sdf_series$sdf <- as.numeric(private$entropy_foos$sdf_recovery(const_and_wts, return_matrix))
+                                  private$normalizing_constant <- mean(private$sdf_series$sdf)
                                   
                                   private$fitted <- TRUE
                                   

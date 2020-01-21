@@ -20,8 +20,15 @@ solve_entropy_problem <- function(entropy_foos
                                   , ...){
   
   if(inherits(entropy_foos, "cressie_read_functions")){
-    pos_ret_constraints <- cccp::nnoc(G = -excess_return_matrix
-                                      , h = matrix(0, nrow = nrow(excess_return_matrix), ncol = 1))
+    sdf_mean <- entropy_foos$get_sdf_mean()
+    entropy_power <- entropy_foos$get_power()
+    if(entropy_foos$get_power() < 0){
+      pos_ret_constraints <- list(cccp::nnoc(G = excess_return_matrix
+                                        , h = matrix(- sdf_mean^entropy_power / entropy_power, nrow = nrow(excess_return_matrix), ncol = 1))) 
+    } else {
+      pos_ret_constraints <- list(cccp::nnoc(G = - excess_return_matrix
+                                        , h = matrix(sdf_mean&entropy_power / entropy_power, nrow = nrow(excess_return_matrix), ncol = 1)))
+    }
   } else {
     pos_ret_constraints <- list()
   }

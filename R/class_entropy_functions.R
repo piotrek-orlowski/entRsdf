@@ -113,6 +113,9 @@ cressie_read_functions <- R6::R6Class("cressie_read_functions"
                                         , get_risk_free_return = function(){
                                           return(1.0/private$sdf_average)
                                         }
+                                        , get_sdf_mean = function(){
+                                          return(private$sdf_average)
+                                        }
                                         , set_power = function(new_power){
                                           private$cr_power <- new_power
                                           invisible(self)
