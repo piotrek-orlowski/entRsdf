@@ -17,28 +17,30 @@ entropy_functions <- R6::R6Class("entropy_functions"
                                    }
                                  )
                                  , private = list(
-                                   description = "This is a generic class for entropy SDF functions"
+                                     cr_power = numeric(1)
+                                     , sdf_average = 1.0
+                                     , description = "This is a generic class for entropy SDF functions"
                                  ))
 
 et_functions <- R6::R6Class("et_functions"
                                , inherit = entropy_functions
                                , public = list(
-                                 objective = function(theta_vector, return_matrix){
-                                    # return_matrix <- cbind(1.0, return_matrix)
+                                 initialize = function(sdf_mean = 1.0){
+                                   private$cr_power <- 0.0
+                                   private$sdf_average <- sdf_mean
+                                 }
+                                 , objective = function(theta_vector, return_matrix){
                                     res <- exp(- return_matrix %*% theta_vector - 1.0)
                                     res <- mean(res) + theta_vector[1L]
                                     return(res)
                                   }
                                  , gradient = function(theta_vector, return_matrix){
-                                    # return_matrix <- cbind(1.0, return_matrix)
                                     res <- exp(- return_matrix %*% theta_vector - 1.0)
                                     res <- - return_matrix * matrix(res, nrow = nrow(return_matrix), ncol = ncol(return_matrix))
                                     res <- apply(res, 2L, mean)
-                                    res <- res + c(1.0, rep(0, ncol(return_matrix)-1.0))
                                     return(res)
                                   }
                                  , hessian = function(theta_vector, return_matrix){
-                                    # return_matrix <- cbind(1.0, return_matrix)
                                     res <- exp(- return_matrix %*% theta_vector - 1.0)
                                     res <- t(return_matrix) %*% (return_matrix * matrix(res, nrow = nrow(return_matrix), ncol = ncol(return_matrix)))
                                     res <- 1.0 / nrow(return_matrix) * res
@@ -130,9 +132,7 @@ cressie_read_functions <- R6::R6Class("cressie_read_functions"
                                         }
                                       )
                                       , private = list(
-                                        cr_power = -0.5 # Hellinger
-                                        , sdf_average = 1.0
-                                        , description = "Functions for fitting and recovering general Cressie-Read SDFs. \nThey correspond to any power different from -1 or 0 in the Cressie-Read function family."
+                                          description = "Functions for fitting and recovering general Cressie-Read SDFs. \nThey correspond to any power different from -1 or 0 in the Cressie-Read function family."
                                       )
                                       )
 
