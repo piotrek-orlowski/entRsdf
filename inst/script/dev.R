@@ -371,7 +371,7 @@ system.time(
   cv_debug$fit()
 )
 
-#### Multi-class ####
+c#### Multi-class ####
 
 chi2_rolling <- window_chi2_cv_pricing_kernel$new(excess_returns = test_assets
                                                   , type = "kullback-leibler"
