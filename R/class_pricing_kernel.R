@@ -181,7 +181,7 @@ pricing_kernel <- R6::R6Class("pricing_kernel"
                                     dplyr::inner_join(new_excess_returns) %>% 
                                     dplyr::select(-date) %>% 
                                     as.matrix()
-                                  pricing_error <- apply(X = return_sdf_matrix[,-1L]
+                                  pricing_error <- apply(X = return_sdf_matrix[,-1L,drop=FALSE]
                                                          , MARGIN = 2L
                                                          , FUN = function(x) 1.0 / length(x) * crossprod(x, return_sdf_matrix[,1L]))
                                   pricing_error <- tibble::tibble(portfolio = setdiff(colnames(new_excess_returns), "date")

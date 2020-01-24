@@ -671,7 +671,7 @@ window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                                 #   - best lambda
                                                 #   - skip sdf value because we will construct it later
                                                 list(theta_vector = theta_pack(approximate_sdf_theta)
-                                                     , lambda_vector = entropy_foos$get_lambda_stored()
+                                                     , lambda_vector = foos_copy$get_lambda_stored()
                                                      , best_penalty = best_penalty
                                                      , sdf_rescale = mean(head(approximate_sdf_series,-1), na.rm=TRUE)
                                                      , sdf_value = tail(approximate_sdf_series, 1L)

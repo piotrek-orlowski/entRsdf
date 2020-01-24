@@ -326,6 +326,11 @@ try(rm(cv_debug))
 
 cv_target <- pricing_kernel$new(excess_returns = test_assets
                                   , type = "kullback-leibler")
+
+cv_target <- pricing_kernel$new(excess_returns = test_assets
+                                , type = "cressie-read"
+                                , cressie_read_power = -0.5
+                                , sdf_mean = 1.0)
 cv_target$fit()
 
 cv_debug <- cv_pricing_kernel$new(excess_returns = test_assets %>% head(-1)
@@ -362,7 +367,7 @@ system.time(
 )
 
 
-cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets
+cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets 
                                          , type = "kullback-leibler"
                                          , sample_type = "expanding"
                                          , sample_span = 180
@@ -371,7 +376,7 @@ system.time(
   cv_debug$fit()
 )
 
-c#### Multi-class ####
+#### Multi-class ####
 
 chi2_rolling <- window_chi2_cv_pricing_kernel$new(excess_returns = test_assets
                                                   , type = "kullback-leibler"

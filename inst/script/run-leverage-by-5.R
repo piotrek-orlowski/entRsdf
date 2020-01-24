@@ -1,9 +1,10 @@
 library(entRsdf)
 library(dplyr)
 
+
 data("fx_portfolios")
 
-lev_span <- seq(50,100,by=5)
+lev_span <- seq(5,45,by=5)
 
 sdf_list <- lapply(lev_span
                    , FUN = function(lev){
