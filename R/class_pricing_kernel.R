@@ -145,7 +145,7 @@ pricing_kernel <- R6::R6Class("pricing_kernel"
                                 }
                                 , fit = function(solver_trace = FALSE, ...){
                                   if(any(is.na(private$pfolio_wts)) | any(is.na(private$normalizing_constant))){
-                                    const_and_wts <- rep(1.0, ncol(private$excess_returns) - 1L) / (ncol(private$excess_returns) - 1L)
+                                    const_and_wts <- rep(0.0, ncol(private$excess_returns) - 1L) / (ncol(private$excess_returns) - 1L)
                                   } else {
                                     const_and_wts <- c(private$pfolio_wts)
                                   }
