@@ -13,41 +13,106 @@
 #' @return (N+1) x 1 \code{matrix}
 #'
 
-solve_entropy_problem <- function(entropy_foos
-                                  , excess_return_matrix
-                                  , theta_vector_init = rep(1.0, ncol(excess_returns))/ncol(excess_returns)
-                                  , solver_trace = FALSE
-                                  , ...){
-  
-  if(inherits(entropy_foos, "cressie_read_functions")){
+solve_entropy_problem <- function(entropy_foos,
+                                  excess_return_matrix,
+                                  theta_vector_init = rep(1.0, ncol(excess_returns)) / ncol(excess_returns),
+                                  solver_trace = FALSE,
+                                  ...) {
+  if (inherits(entropy_foos, "cressie_read_functions")) {
     sdf_mean <- entropy_foos$get_sdf_mean()
     entropy_power <- entropy_foos$get_power()
-    if(entropy_foos$get_power() < 0){
-      pos_ret_constraints <- list(cccp::nnoc(G = excess_return_matrix
-                                        , h = matrix(- sdf_mean^entropy_power / entropy_power, nrow = nrow(excess_return_matrix), ncol = 1))) 
+    if (entropy_foos$get_power() < 0) {
+      pos_ret_constraints <- list(cccp::nnoc(
+        G = excess_return_matrix,
+        h = matrix(-sdf_mean^entropy_power / entropy_power, nrow = nrow(excess_return_matrix), ncol = 1)
+      ))
     } else {
-      pos_ret_constraints <- list(cccp::nnoc(G = - excess_return_matrix
-                                        , h = matrix(sdf_mean&entropy_power / entropy_power, nrow = nrow(excess_return_matrix), ncol = 1)))
+      pos_ret_constraints <- list(cccp::nnoc(
+        G = -excess_return_matrix,
+        h = matrix(sdf_mean^entropy_power / entropy_power, nrow = nrow(excess_return_matrix), ncol = 1)
+      ))
     }
   } else {
     pos_ret_constraints <- list()
   }
-  
-  optimisation_result <- cccp::cccp(f0 = function(x) entropy_foos$objective(x, excess_return_matrix)
-                                    , g0 = function(x) entropy_foos$gradient(x, excess_return_matrix)
-                                    , h0 = function(x) entropy_foos$hessian(x, excess_return_matrix)
-                                    , x0 = theta_vector_init
-                                    , optctrl = cccp::ctrl(trace = solver_trace, ...)
-                                    , cList = pos_ret_constraints)
-  
-  if(optimisation_result$status == "optimal"){
-    
+
+  optimisation_result <- cccp::cccp(
+    f0 = function(x) entropy_foos$objective(x, excess_return_matrix),
+    g0 = function(x) entropy_foos$gradient(x, excess_return_matrix),
+    h0 = function(x) entropy_foos$hessian(x, excess_return_matrix),
+    x0 = theta_vector_init,
+    optctrl = cccp::ctrl(trace = solver_trace, ...),
+    cList = pos_ret_constraints
+  )
+
+  if (optimisation_result$status == "optimal") {
     return(cccp::getx(optimisation_result))
-    
   } else {
-    
     warning("The optimisation did not converge, make sure the results are ok")
-    
+
+    return(cccp::getx(optimisation_result))
+  }
+}
+
+solve_bivariate_entropy_problem <- function(entropy_foos,
+                                            home_return_matrix,
+                                            foreign_return_matrix,
+                                            theta_vector_init = rep(1.0, (ncol(home_return_matrix) + ncol(foreign_return_matrix)) - 2L),
+                                            solver_trace = FALSE,
+                                            ...) {
+  home_excess_return_matrix <- apply(
+    home_return_matrix[, -1L, drop = FALSE],
+    2L,
+    function(ret) {
+      ret - home_return_matrix[, 1L]
+    }
+  )
+
+  foreign_excess_return_matrix <- apply(
+    foreign_return_matrix[, -1L, drop = FALSE],
+    2L,
+    function(ret) {
+      ret - foreign_return_matrix[, 1L]
+    }
+  )
+
+  home_size <- dim(home_excess_return_matrix)
+  foreign_size <- dim(foreign_excess_return_matrix)
+
+  home_excess_return_matrix <- cbind(home_excess_return_matrix, matrix(0.0, foreign_size[1L], foreign_size[2L]))
+  foreign_excess_return_matrix <- cbind(matrix(0.0, home_size[1L], home_size[2L]), foreign_excess_return_matrix)
+
+  pos_ret_constraints <- list(
+    cccp::nnoc(
+      G = -home_excess_return_matrix,
+      h = matrix(home_return_matrix[, 1L], home_size[1L], 1L)
+    ),
+    cccp::nnoc(
+      G = -foreign_excess_return_matrix,
+      h = matrix(foreign_return_matrix[, 1L], foreign_size[1L], 1L)
+    )
+  )
+
+  optimisation_result <- cccp::cccp(
+    f0 = function(x) entropy_foos$objective(x, home_return_matrix, foreign_return_matrix),
+    g0 = function(x) entropy_foos$gradient(x, home_return_matrix, foreign_return_matrix),
+    h0 = function(x) entropy_foos$hessian(x, home_return_matrix, foreign_return_matrix),
+    x0 = theta_vector_init,
+    optctrl = cccp::ctrl(
+      maxiters = 1e2L,
+      trace = solver_trace,
+      abstol = 1e-12,
+      reltol = 1e-10,
+      ...
+    ),
+    cList = pos_ret_constraints
+  )
+
+  if (optimisation_result$status == "optimal") {
+    return(cccp::getx(optimisation_result))
+  } else {
+    warning("The optimisation did not converge, make sure the results are ok")
+
     return(cccp::getx(optimisation_result))
   }
 }
