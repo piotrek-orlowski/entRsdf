@@ -57,7 +57,7 @@ solve_entropy_problem <- function(entropy_foos,
 solve_bivariate_entropy_problem <- function(entropy_foos,
                                             home_return_matrix,
                                             foreign_return_matrix,
-                                            theta_vector_init = rep(1.0, (ncol(home_return_matrix) + ncol(foreign_return_matrix)) - 2L),
+                                            theta_vector_init = rep(0.0, (ncol(home_return_matrix) + ncol(foreign_return_matrix)) - 2L),
                                             solver_trace = FALSE,
                                             ...) {
   home_excess_return_matrix <- apply(
@@ -109,10 +109,10 @@ solve_bivariate_entropy_problem <- function(entropy_foos,
   )
 
   if (optimisation_result$status == "optimal") {
-    return(cccp::getx(optimisation_result))
+    return(optimisation_result)
   } else {
     warning("The optimisation did not converge, make sure the results are ok")
 
-    return(cccp::getx(optimisation_result))
+    return(optimisation_result)
   }
 }

@@ -90,7 +90,6 @@ cressie_read_functions <- R6::R6Class("cressie_read_functions",
     hessian = function(theta_vector, return_matrix) {
       sdf_expect <- private$sdf_average
       cr_pow <- private$cr_power
-      # return_matrix <- return_matrix - 1.0 / sdf_expect # because excess returns
       res <- cr_pow * return_matrix %*% theta_vector
       res <- res + sdf_expect^cr_pow
       res <- -res^((1.0 - cr_pow) / cr_pow)
@@ -102,7 +101,6 @@ cressie_read_functions <- R6::R6Class("cressie_read_functions",
     sdf_recovery = function(theta_vector, return_matrix) {
       sdf_expect <- private$sdf_average
       cr_pow <- private$cr_power
-      # return_matrix <- return_matrix - 1.0 / sdf_expect # because excess returns
       res <- cr_pow * return_matrix %*% theta_vector
       res <- res + sdf_expect^cr_pow
       res <- res^(1.0 / cr_pow)
@@ -200,6 +198,8 @@ distance_et_functions <- R6::R6Class("distance_et_functions",
 bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
   public = list(
     initialize = function(sdf_powers) {
+
+      names(sdf_powers) <- c("home_power", "foreign_power")
       private$sdf_powers <- sdf_powers
 
       mgf_powers <- sdf_powers / (sum(sdf_powers) - 1)
@@ -224,9 +224,9 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
       portfolio_return_matrix <- return_matrix %*% theta_matrix
 
-      if (any(portfolio_return_matrix < 0)) {
-        return(1e6)
-      }
+      # if (any(portfolio_return_matrix < 0)) {
+      #   return(1e6)
+      # }
       mgf_powers <- private$mgf_powers
 
       portfolio_return_matrix[, 1L] <- portfolio_return_matrix[, 1L]^mgf_powers[1L]
@@ -261,9 +261,9 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
       portfolio_return_matrix <- return_matrix %*% theta_matrix
 
-      if (any(portfolio_return_matrix < 0)) {
-        return(1e6)
-      }
+      # if (any(portfolio_return_matrix < 0)) {
+      #   return(1e6)
+      # }
       mgf_powers <- private$mgf_powers
 
       portfolio_return_powers_min_one <- portfolio_return_powers <- portfolio_return_matrix
@@ -327,9 +327,9 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
       portfolio_return_matrix <- return_matrix %*% theta_matrix
 
-      if (any(portfolio_return_matrix < 0)) {
-        return(1e6)
-      }
+      # if (any(portfolio_return_matrix < 0)) {
+      #   return(1e6)
+      # }
       mgf_powers <- private$mgf_powers
 
       portfolio_return_powers_min_two <- portfolio_return_powers_min_one <- portfolio_return_powers <- portfolio_return_matrix
@@ -456,18 +456,22 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
       return(cbind(home_sdf, foreign_sdf))
     },
+    get_return_mgf = function() {},
+    get_return_cgf = function() {},
     set_powers = function(new_powers) {
       private$mgf_powers <- new_powers
       invisible(self)
     },
     get_powers = function() {
       private$mgf_powers
+    },
+    get_sdf_powers = function() {
+      private$sdf_powers
     }
   ),
   private = list(
     mgf_powers = NULL,
     sdf_powers = NULL,
-    lambda_opt = NULL,
     description = "AFD bivariate functions"
   )
 )

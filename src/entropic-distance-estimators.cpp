@@ -5,6 +5,7 @@ using namespace std;
 
 // [[Rcpp::depends(RcppArmadillo)]]
 
+// this is given theta
 // [[Rcpp::export]]
 Rcpp::List et_distance_objective(arma::vec lambda_exact
                                , arma::vec theta_extended
@@ -29,6 +30,9 @@ Rcpp::List et_distance_objective(arma::vec lambda_exact
   // Add penalty
   objective = objective + penalty;
   
+  // Add sum of lambdas
+  objective = objective + arma::accu(lambda_exact);
+  
   // Switch sign (this is the dual problem and normally you would maximize, but a solver minimizes)
   objective = -objective;
   
@@ -46,12 +50,40 @@ Rcpp::List et_distance_objective(arma::vec lambda_exact
   // Average priced returns
   arma::vec gradient = arma::mean(returns_prices_exact, 0).t() + arma::mean(returns_prices_model, 0).t();
   
+  // price of gross returns
+  gradient = gradient - arma::ones(lambda_exact.size());
+  
   // Return
   return Rcpp::List::create(Rcpp::Named("objective") = objective
                               , Rcpp::Named("gradient") = gradient
                               , Rcpp::Named("other") = 2.0);
 }
 
+// this is given theta
+// [[Rcpp::export]]
+arma::vec et_distance_individual(arma::vec lambda_exact
+                                   , arma::vec theta_extended
+                                   , arma::mat return_matrix
+                                   ){
+  
+  // Stack return matrix twice side by side in order to deal with extended parameter vector
+  arma::mat return_matrix_stacked = arma::join_rows(return_matrix, -return_matrix);
+  
+  // Calculate returns on exact SDF portfolio
+  arma::mat lambda_return = return_matrix * lambda_exact;
+  
+  // Caclulate expected utility of exact SDF portfolio
+  arma::vec sample_distance = - arma::exp(lambda_return);
+  
+  // Add (subtract, actually) contribution of expected utility of approximate SDF portfolio times exact return
+  sample_distance = sample_distance - (arma::exp(return_matrix_stacked * theta_extended) - arma::ones(lambda_return.size())) % lambda_return;
+  
+  // Add sum of lambdas
+  sample_distance = sample_distance + arma::ones(sample_distance.size()) * arma::accu(lambda_exact);
+  
+  // Return
+  return sample_distance;
+}
 
 // Currently unnecessary
 arma::vec et_distance_lambda_gradient(arma::vec lambda_exact
@@ -104,6 +136,7 @@ arma::mat et_distance_lambda_hessian(arma::vec lambda_exact
   return res;
 }
 
+// gradient wrt theta at optimal lambda
 // [[Rcpp::export]]
 arma::mat et_distance_theta_gradient(arma::vec lambda_opt
                                        , arma::vec theta_extended

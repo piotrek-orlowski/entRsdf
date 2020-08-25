@@ -20,6 +20,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// et_distance_individual
+arma::vec et_distance_individual(arma::vec lambda_exact, arma::vec theta_extended, arma::mat return_matrix);
+RcppExport SEXP _entRsdf_et_distance_individual(SEXP lambda_exactSEXP, SEXP theta_extendedSEXP, SEXP return_matrixSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type lambda_exact(lambda_exactSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type theta_extended(theta_extendedSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type return_matrix(return_matrixSEXP);
+    rcpp_result_gen = Rcpp::wrap(et_distance_individual(lambda_exact, theta_extended, return_matrix));
+    return rcpp_result_gen;
+END_RCPP
+}
 // et_distance_theta_gradient
 arma::mat et_distance_theta_gradient(arma::vec lambda_opt, arma::vec theta_extended, arma::mat return_matrix, double mu_penalty);
 RcppExport SEXP _entRsdf_et_distance_theta_gradient(SEXP lambda_optSEXP, SEXP theta_extendedSEXP, SEXP return_matrixSEXP, SEXP mu_penaltySEXP) {
@@ -37,6 +50,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_entRsdf_et_distance_objective", (DL_FUNC) &_entRsdf_et_distance_objective, 4},
+    {"_entRsdf_et_distance_individual", (DL_FUNC) &_entRsdf_et_distance_individual, 3},
     {"_entRsdf_et_distance_theta_gradient", (DL_FUNC) &_entRsdf_et_distance_theta_gradient, 4},
     {NULL, NULL, 0}
 };

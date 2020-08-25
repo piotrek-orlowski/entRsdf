@@ -3,6 +3,10 @@ cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date =
                                           , penalty_par
                                           , num_folds = 5L){
   
+  # go to gross returns
+  excess_returns <- excess_returns %>% 
+    mutate_if(is.numeric, ~ . + 1.0)
+  
   # Call the super class initializer
   super$initialize(type = type
                    , excess_returns = excess_returns)
@@ -64,22 +68,46 @@ lev_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date 
     maximum_leverage <- eval(quote(private$maximum_leverage), envir = envir)
     def_opts <- eval(quote(def_opts), envir = envir)
     def_opts$algorithm <- "NLOPT_LD_SLSQP"
+    
+    leverage_constraint <- function(theta_vector, return_matrix, penalty_value){
+        list(constraints = sum(theta_vector) - maximum_leverage
+           , jacobian = matrix(1, ncol = length(theta_vector), nrow = 1)
+           )
+    }
+    
+    normalise_constraint <- function(theta_vector, return_matrix, penalty_value){
+      return_matrix_extended <- cbind(return_matrix, -return_matrix)
+      approximate_sdf <- exp(return_matrix_extended %*% theta_vector)
+      
+      res <- mean(approximate_sdf) - 1
+      
+      res_deriv <- apply(return_matrix_extended, 2, function(ret){
+        mean(ret * approximate_sdf)
+      })
+
+      list(constraints = res
+           , jacobian = matrix(as.numeric(res_deriv), ncol = length(theta_vector), nrow = 1))
+    }
+    
     outer_sol <- tryCatch(
-      nloptr::nloptr(x0 = eval(quote(temp_sol), envir = envir)
+      nloptr::nloptr(x0 = rep(0, length(eval(quote(temp_sol), envir = envir)))
                      , eval_f = eval(quote(foos_copy$objective), envir = envir)
                      , lb = rep(0, length(eval(quote(temp_sol), envir = envir)))
-                     , eval_g_ineq = function(theta_vector, return_matrix, penalty_value){
-                       list(constraints = sum(theta_vector) - maximum_leverage
-                            , jacobian = matrix(1, ncol = length(theta_vector), nrow = 1))
-                     }
+                     , eval_g_eq = normalise_constraint
+                     , eval_g_ineq = leverage_constraint
                      , opts = def_opts
                      , return_matrix = eval(quote(return_matrix), envir = envir)
                      , penalty_value = 0)
-      , error = function(e) list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+      
+      , error = function(e) {
+          print(e)
+          list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+        }
     )
-    if(!any(is.na(outer_sol))){
-      temp_sol <<- outer_sol$solution  
-    }
+    # if(!any(is.na(outer_sol))){
+      # temp_sol <<- outer_sol$solution  
+    # }
+    # browser()
     return_matrix <- eval(quote(return_matrix), envir = envir)
     sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
     sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
@@ -163,22 +191,45 @@ window_lev_pricing_kernel_constructor <- function(excess_returns = tibble::tibbl
     maximum_leverage <- eval(quote(private$maximum_leverage), envir = envir)
     def_opts <- eval(quote(def_opts), envir = envir)
     def_opts$algorithm <- "NLOPT_LD_SLSQP"
+    
+    leverage_constraint <- function(theta_vector, return_matrix, penalty_value){
+      list(constraints = sum(theta_vector) - maximum_leverage
+           , jacobian = matrix(1, ncol = length(theta_vector), nrow = 1)
+      )
+    }
+    
+    normalise_constraint <- function(theta_vector, return_matrix, penalty_value){
+      return_matrix_extended <- cbind(return_matrix, -return_matrix)
+      approximate_sdf <- exp(return_matrix_extended %*% theta_vector)
+      
+      res <- mean(approximate_sdf) - 1
+      
+      res_deriv <- apply(return_matrix_extended, 2, function(ret){
+        mean(ret * approximate_sdf)
+      })
+      
+      list(constraints = res
+           , jacobian = matrix(as.numeric(res_deriv), ncol = length(theta_vector), nrow = 1))
+    }
+    
     outer_sol <- tryCatch(
-      nloptr::nloptr(x0 = eval(quote(temp_sol), envir = envir)
+      nloptr::nloptr(x0 = rep(0, length(eval(quote(temp_sol), envir = envir)))
                      , eval_f = eval(quote(foos_copy$objective), envir = envir)
                      , lb = rep(0, length(eval(quote(temp_sol), envir = envir)))
-                     , eval_g_ineq = function(theta_vector, return_matrix, penalty_value){
-                       list(constraints = sum(theta_vector) - maximum_leverage
-                            , jacobian = matrix(1, ncol = length(theta_vector), nrow = 1))
-                     }
+                     , eval_g_eq = normalise_constraint
+                     , eval_g_ineq = leverage_constraint
                      , opts = def_opts
                      , return_matrix = eval(quote(return_matrix), envir = envir)
                      , penalty_value = 0)
-      , error = function(e) list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+      
+      , error = function(e) {
+        print(e)
+        list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+      }
     )
-    if(!any(is.na(outer_sol))){
-      temp_sol <<- outer_sol$solution  
-    }
+    # if(!any(is.na(outer_sol))){
+    # temp_sol <<- outer_sol$solution  
+    # }
     return_matrix <- eval(quote(return_matrix), envir = envir)
     sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
     sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
@@ -357,6 +408,26 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         
                                         private$full_sdf_series <- tibble::tibble(date = private$sdf_series$date, sdf = as.numeric(full_sdf_series))
                                         
+                                        # Calculate distance and distance p-value
+                                        indiv_distance <- et_distance_individual(lambda_exact = private$complementary_pfolio_wts
+                                                                                  , theta_extended = private$theta_unpack(private$pfolio_wts)
+                                                                                  , return_matrix = return_matrix)
+                                        
+                                        indiv_distance <- indiv_distance + 1.0
+                                        
+                                        # average over time
+                                        sample_distance <- mean(indiv_distance)
+                                        
+                                        private$sdf_distance <- sample_distance
+                                        
+                                        # calculate variance of sample distance
+                                        sample_distance_asy_var <- sandwich::NeweyWest(lm(indiv_distance ~ 1.0)) %>% as.numeric()
+                                        
+                                        # calculate sdf t-stat
+                                        private$sdf_distance_tstat <- sample_distance / sqrt(sample_distance_asy_var)
+                                        private$sdf_distance_pvalue <- 1 - pnorm(sample_distance / sqrt(sample_distance_asy_var))
+                                        
+                                        
                                         # update fitted status
                                         private$fitted <- TRUE
                                         
@@ -382,7 +453,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                       }
                                       , full_asset_pricing = function(new_excess_returns = NULL){
                                         if(is.null(new_excess_returns)){
-                                          new_excess_returns <- private$excess_returns
+                                          new_excess_returns <- self$get_excess_returns()
                                         }
                                         return_sdf_matrix <- private$full_sdf_series %>% 
                                           dplyr::inner_join(new_excess_returns) %>% 
@@ -394,6 +465,19 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         pricing_error <- tibble::tibble(portfolio = setdiff(colnames(new_excess_returns), "date")
                                                                         , pricing_error = pricing_error)
                                         return(pricing_error)
+                                      }
+                                      , get_sdf_distance = function(){
+                                        tibble(sdf_distance = private$sdf_distance
+                                               , sdf_tstat = private$sdf_distance_tstat
+                                               , sdf_pvalue = private$sdf_distance_pvalue)
+                                      }
+                                      , get_excess_returns = function(){
+                                        private$excess_returns
+                                      }
+                                      , get_excess_returns_tidy = function(){
+                                        excess_returns <- super$get_excess_returns_tidy()
+                                        # excess_returns <- excess_returns %>% mutate(return = return - 1.0)
+                                        excess_returns
                                       }
                                     )
                                     , private = list(
@@ -484,6 +568,9 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         parallel::clusterEvalQ(par_cluster, {library(dplyr); library(entRsdf)})
                                         par_cluster
                                       }
+                                      , sdf_distance = NA_real_
+                                      , sdf_distance_tstat = NA_real_
+                                      , sdf_distance_pvalue = NA_real_
                                     ))
 
 lev_pricing_kernel <- R6::R6Class("lev_pricing_kernel"
