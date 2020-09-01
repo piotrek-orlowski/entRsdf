@@ -242,7 +242,7 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
       return(res)
     },
-    gradient = function(theta_vector, home_return_matrix, foreign_return_matrix) {
+    gradient = function(theta_vector, home_return_matrix, foreign_return_matrix, for_inference = FALSE) {
       num_home <- ncol(home_return_matrix)
       num_foreign <- ncol(foreign_return_matrix)
       num_tot <- num_home + num_foreign
@@ -300,9 +300,9 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
       excess_return_matrix <- cbind(home_excess_return_matrix, foreign_excess_return_matrix)
 
-      # excess_return_matrix <- apply(excess_return_matrix
-      #                               , 2L
-      #                               , function(ret) ret * portfolio_return_powers)
+      if(for_inference){
+        return(excess_return_matrix)
+      }
 
       gradient_res <- apply(excess_return_matrix, 2L, mean)
 
@@ -413,7 +413,7 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
       return(hessian_all)
     },
-    sdf_recovery = function(theta_vector, home_return_matrix, foreign_return_matrix) {
+    sdf_recovery = function(theta_vector, home_return_matrix, foreign_return_matrix, for_inference = FALSE) {
       num_home <- ncol(home_return_matrix)
       num_foreign <- ncol(foreign_return_matrix)
       num_tot <- num_home + num_foreign
@@ -431,6 +431,11 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
 
       portfolio_return_matrix <- return_matrix %*% theta_matrix
+      
+      if(for_inference){
+        neg_rows <- apply(portfolio_return_matrix, 1L, function(x) any(x <= 0))
+        portfolio_return_matrix <- portfolio_return_matrix[!neg_rows,]
+      }
 
       # SDF denominator
       portfolio_return_mgf_powers <- sapply(
