@@ -425,7 +425,7 @@ cv_pricing_kernel <- R6::R6Class("cv_pricing_kernel"
                                         
                                         # calculate sdf t-stat
                                         private$sdf_distance_tstat <- sample_distance / sqrt(sample_distance_asy_var)
-                                        private$sdf_distance_pvalue <- 1 - pnorm(sample_distance / sqrt(sample_distance_asy_var))
+                                        private$sdf_distance_pvalue <- 2 * (1 - pnorm(sample_distance / sqrt(sample_distance_asy_var)))
                                         
                                         
                                         # update fitted status
