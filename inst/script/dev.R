@@ -308,11 +308,11 @@ debug(private$cv_criterion)
 debug(cv_debug$fit)
 cv_debug$fit()
 
-lev_debug <- lev_pricing_kernel$new(excess_returns = test_assets[,1:7]
+lev_debug <- lev_pricing_kernel$new(excess_returns = test_assets
                                     , type = "kullback-leibler"
-                                    , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
-                                    , num_folds = 1L
-                                    , maximum_leverage = 25)
+                                    # , penalty_par = exp(seq(log(0.01), log(0.000001), length.out = 100))
+                                    # , num_folds = 1L
+                                    , maximum_leverage = 50)
 
 lev_debug$fit()
 
@@ -366,12 +366,13 @@ system.time(
   cv_debug$fit()
 )
 
-
-cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets 
+# watch out this was modified for testing the gross return approach
+cv_debug <- window_lev_pricing_kernel$new(excess_returns = test_assets
                                          , type = "kullback-leibler"
                                          , sample_type = "expanding"
                                          , sample_span = 180
                                          , maximum_leverage = 50)
+
 system.time(
   cv_debug$fit()
 )
