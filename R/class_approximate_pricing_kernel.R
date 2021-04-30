@@ -116,6 +116,69 @@ lev_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date 
   }
 }
 
+ridge_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date = anytime::anydate(NA_real_))
+                                           , type = c("kullback-leibler", "exponential-tilting", "cressie-read")
+                                           , maximum_leverage){
+  super$initialize(excess_returns = excess_returns
+                   , type = type
+                   , maximum_leverage = maximum_leverage)
+  
+  # set up optimisation function
+  private$optim_fun <- function(mu, envir) {
+    maximum_leverage <- eval(quote(private$maximum_leverage), envir = envir)
+    def_opts <- eval(quote(def_opts), envir = envir)
+    def_opts$algorithm <- "NLOPT_LD_SLSQP"
+    
+
+    leverage_constraint <- function(theta_vector, return_matrix, penalty_value){
+      vec_len <- length(theta_vector)
+      theta_new <- private$theta_pack(theta_vector)
+      list(constraints = sum(theta_new^2) - maximum_leverage
+           , jacobian = matrix(2 * theta_vector, ncol = length(theta_vector), nrow = 1)
+      )
+    }
+    
+    normalise_constraint <- function(theta_vector, return_matrix, penalty_value){
+      return_matrix_extended <- cbind(return_matrix, -return_matrix)
+      approximate_sdf <- exp(return_matrix_extended %*% theta_vector)
+      
+      res <- mean(approximate_sdf) - 1
+      
+      res_deriv <- apply(return_matrix_extended, 2, function(ret){
+        mean(ret * approximate_sdf)
+      })
+      
+      list(constraints = res
+           , jacobian = matrix(as.numeric(res_deriv), ncol = length(theta_vector), nrow = 1))
+    }
+    
+    outer_sol <- tryCatch(
+      nloptr::nloptr(x0 = rep(0, length(eval(quote(temp_sol), envir = envir)))
+                     , eval_f = eval(quote(foos_copy$objective), envir = envir)
+                     , lb = rep(0, length(eval(quote(temp_sol), envir = envir)))
+                     , eval_g_eq = normalise_constraint
+                     , eval_g_ineq = leverage_constraint
+                     , opts = def_opts
+                     , return_matrix = eval(quote(return_matrix), envir = envir)
+                     , penalty_value = 0)
+      
+      , error = function(e) {
+        print(e)
+        list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+      }
+    )
+    # if(!any(is.na(outer_sol))){
+    # temp_sol <<- outer_sol$solution  
+    # }
+    # browser()
+    return_matrix <- eval(quote(return_matrix), envir = envir)
+    sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
+    sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
+    rbind(theta_packed = sol_packed
+          , lambda_full = eval(quote(foos_copy$get_lambda_stored()), envir = envir))
+  }
+}
+
 window_cv_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date = anytime::anydate(NA_real_))
                                                  , type = c("kullback-leibler", "exponential-tilting", "cressie-read")
                                                  , penalty_par
@@ -195,6 +258,72 @@ window_lev_pricing_kernel_constructor <- function(excess_returns = tibble::tibbl
     leverage_constraint <- function(theta_vector, return_matrix, penalty_value){
       list(constraints = sum(theta_vector) - maximum_leverage
            , jacobian = matrix(1, ncol = length(theta_vector), nrow = 1)
+      )
+    }
+    
+    normalise_constraint <- function(theta_vector, return_matrix, penalty_value){
+      return_matrix_extended <- cbind(return_matrix, -return_matrix)
+      approximate_sdf <- exp(return_matrix_extended %*% theta_vector)
+      
+      res <- mean(approximate_sdf) - 1
+      
+      res_deriv <- apply(return_matrix_extended, 2, function(ret){
+        mean(ret * approximate_sdf)
+      })
+      
+      list(constraints = res
+           , jacobian = matrix(as.numeric(res_deriv), ncol = length(theta_vector), nrow = 1))
+    }
+    
+    outer_sol <- tryCatch(
+      nloptr::nloptr(x0 = rep(0, length(eval(quote(temp_sol), envir = envir)))
+                     , eval_f = eval(quote(foos_copy$objective), envir = envir)
+                     , lb = rep(0, length(eval(quote(temp_sol), envir = envir)))
+                     , eval_g_eq = normalise_constraint
+                     , eval_g_ineq = leverage_constraint
+                     , opts = def_opts
+                     , return_matrix = eval(quote(return_matrix), envir = envir)
+                     , penalty_value = 0)
+      
+      , error = function(e) {
+        print(e)
+        list(solution = rep(NA_real_, length(eval(quote(temp_sol), envir = envir))))
+      }
+    )
+    # if(!any(is.na(outer_sol))){
+    # temp_sol <<- outer_sol$solution  
+    # }
+    return_matrix <- eval(quote(return_matrix), envir = envir)
+    sol_packed <- outer_sol$solution[1L:ncol(return_matrix)]
+    sol_packed <- sol_packed - outer_sol$solution[(ncol(return_matrix)+1L):(2*ncol(return_matrix))]
+    rbind(theta_packed = sol_packed
+          , lambda_full = eval(quote(foos_copy$get_lambda_stored()), envir = envir))
+  }
+}
+
+window_ridge_pricing_kernel_constructor <- function(excess_returns = tibble::tibble(date = anytime::anydate(NA_real_))
+                                                  , type = c("kullback-leibler", "exponential-tilting", "cressie-read")
+                                                  , sample_type = c("expanding", "rolling")
+                                                  , sample_span = 180L
+                                                  , maximum_leverage){
+  super$initialize(excess_returns = excess_returns
+                   , type = type
+                   , maximum_leverage = maximum_leverage
+                   , sample_type = sample_type
+                   , sample_span = sample_span)
+  private$maximum_leverage <- maximum_leverage
+  
+  # set up optimisation function
+  private$optim_fun <- function(mu, envir) {
+    maximum_leverage <- eval(quote(private$maximum_leverage), envir = envir)
+    def_opts <- eval(quote(def_opts), envir = envir)
+    def_opts$algorithm <- "NLOPT_LD_SLSQP"
+    
+    leverage_constraint <- function(theta_vector, return_matrix, penalty_value){
+      vec_len <- length(theta_vector)
+      theta_new <- private$theta_pack(theta_vector)
+      list(constraints = sum(theta_new^2) - maximum_leverage
+           , jacobian = matrix(2 * theta_vector, ncol = length(theta_vector), nrow = 1)
       )
     }
     
@@ -591,6 +720,13 @@ lev_pricing_kernel <- R6::R6Class("lev_pricing_kernel"
                                     , maximum_leverage = NULL
                                   ))
 
+ridge_pricing_kernel <- R6::R6Class("ridge_pricing_kernel"
+                                    , inherit = lev_pricing_kernel
+                                    , public = list(
+                                      initialize = ridge_pricing_kernel_constructor
+                                    )
+                                    )
+
 window_cv_pricing_kernel <- R6::R6Class("window_cv_pricing_kernel"
                                         , inherit = cv_pricing_kernel
                                         , public = list(
@@ -949,6 +1085,25 @@ window_lev_pricing_kernel = R6::R6Class("window_lev_pricing_kernel"
                                         , inherit = window_cv_pricing_kernel
                                         , public = list(
                                           initialize = window_lev_pricing_kernel_constructor
+                                        )
+                                        , private = list(
+                                          cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
+                                            # recover portfolio coefficients (matrix size of num assets x penalty par)
+                                            loc_coefs <- coefficients_by_fold[[fold+1]]$theta_compact_matrix
+                                            
+                                            # calculate excess leverage
+                                            excess_leverage <- apply(X = loc_coefs
+                                                                     , MARGIN = 1L
+                                                                     , function(vec){
+                                                                       (sum(abs(vec)) - private$maximum_leverage)^2
+                                                                     })}
+                                          , maximum_leverage = NULL
+                                        ))
+
+window_ridge_pricing_kernel = R6::R6Class("window_ridge_pricing_kernel"
+                                        , inherit = window_lev_pricing_kernel
+                                        , public = list(
+                                          initialize = window_ridge_pricing_kernel_constructor
                                         )
                                         , private = list(
                                           cv_criterion = function(fold, return_df, coefficients_by_fold, cv_target){
