@@ -91,7 +91,7 @@ bivariate_pricing_kernel <- R6::R6Class("bivariate_pricing_kernel",
         as.matrix()
 
       ## Solve optimisation problem: infimum of MGF
-      optimisation_problem <- solve_bivariate_entropy_problem(
+      optimisation_problem <- solve_bivariate_entropy_problem_nloptr(
         entropy_foos = private$entropy_foos,
         home_return_matrix = home_return_matrix,
         foreign_return_matrix = foreign_return_matrix,
@@ -100,8 +100,10 @@ bivariate_pricing_kernel <- R6::R6Class("bivariate_pricing_kernel",
       )
 
       ## Collect information about solution
-      wts <- cccp::getx(optimisation_problem)
-      mgf <- cccp::getstate(optimisation_problem)["pobj"]
+      # wts <- cccp::getx(optimisation_problem)
+      # mgf <- cccp::getstate(optimisation_problem)["pobj"]
+      wts <- optimisation_problem$par
+      mgf <- optimisation_problem$value
       names(mgf) <- NULL
 
       ## Create and store SDF

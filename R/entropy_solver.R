@@ -116,3 +116,64 @@ solve_bivariate_entropy_problem <- function(entropy_foos,
     return(optimisation_result)
   }
 }
+
+solve_bivariate_entropy_problem_nloptr <- function(entropy_foos,
+                                            home_return_matrix,
+                                            foreign_return_matrix,
+                                            theta_vector_init = rep(0.0, (ncol(home_return_matrix) + ncol(foreign_return_matrix)) - 2L),
+                                            solver_trace = FALSE,
+                                            ...) {
+  home_excess_return_matrix <- apply(
+    home_return_matrix[, -1L, drop = FALSE],
+    2L,
+    function(ret) {
+      ret - home_return_matrix[, 1L]
+    }
+  )
+  
+  foreign_excess_return_matrix <- apply(
+    foreign_return_matrix[, -1L, drop = FALSE],
+    2L,
+    function(ret) {
+      ret - foreign_return_matrix[, 1L]
+    }
+  )
+  
+  home_size <- dim(home_excess_return_matrix)
+  foreign_size <- dim(foreign_excess_return_matrix)
+  
+  home_excess_return_matrix <- cbind(home_excess_return_matrix, matrix(0.0, foreign_size[1L], foreign_size[2L]))
+  foreign_excess_return_matrix <- cbind(matrix(0.0, home_size[1L], home_size[2L]), foreign_excess_return_matrix)
+  
+  pos_ret_constraint <- function(theta) {
+    rbind(
+      home_excess_return_matrix,
+      foreign_excess_return_matrix
+    ) %*% 
+      theta + 
+      rbind(
+        home_return_matrix[,1L,drop=F],
+        foreign_return_matrix[,1L,drop=F]
+      )
+  }
+  
+  pos_ret_constraint_jac <- function(theta) {
+    rbind(home_excess_return_matrix, foreign_excess_return_matrix)
+  }
+  
+  optimisation_result <- nloptr::slsqp(
+    fn = function(x) entropy_foos$objective(x, home_return_matrix, foreign_return_matrix),
+    gr = function(x) entropy_foos$gradient(x, home_return_matrix, foreign_return_matrix),
+    x0 = theta_vector_init,
+    hin = pos_ret_constraint, 
+    hinjac = pos_ret_constraint_jac
+  )
+  
+  if (optimisation_result$convergence != -1) {
+    return(optimisation_result)
+  } else {
+    warning("The optimisation did not converge, make sure the results are ok")
+    
+    return(optimisation_result)
+  }
+}
