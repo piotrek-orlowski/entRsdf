@@ -239,6 +239,12 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
       )
 
       res <- mean(portfolio_return_matrix)
+      
+      # To account for negative quadrant where we have to maximize
+      sdf_powers <- private$sdf_powers
+      if(1.0 - sum(sdf_powers) > 0) {
+        res <- (-1.0)*res
+      }
 
       return(res)
     },
@@ -305,6 +311,12 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
       }
 
       gradient_res <- apply(excess_return_matrix, 2L, mean)
+      
+      # To account for negative quadrant where we have to maximize
+      sdf_powers <- private$sdf_powers
+      if(1.0 - sum(sdf_powers) > 0) {
+        gradient_res <- (-1.0)*gradient_res
+      }
 
       return(gradient_res)
     },
@@ -326,6 +338,8 @@ bivariate_mgf_functions <- R6::R6Class("bivariate_mgf_functions",
 
 
       portfolio_return_matrix <- return_matrix %*% theta_matrix
+      # Careful when we hit zero
+      portfolio_return_matrix[which(portfolio_return_matrix < 1e-1)] <- 1e-1
 
       # if (any(portfolio_return_matrix < 0)) {
       #   return(1e6)
